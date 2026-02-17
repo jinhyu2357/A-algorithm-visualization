@@ -1,11 +1,4 @@
-diff --git a/README.md b/README.md
-index 022c840bf72dd8c3107182239e5c9eddf92f35ea..0627bbd69c48f68cb72fe316ebc16760dbceaf75 100644
---- a/README.md
-+++ b/README.md
-@@ -1,2 +1,95 @@
--# A-algorithm-visualization
--Just, A* algorithm visualization
-+# A* 알고리즘 시각화 (Python)
+A* 알고리즘 시각화 (Python)
 +
 +50×50 미로에서 시작점과 도착점을 설정하고, **A* 알고리즘이 탐색하는 과정 전체**를 색상으로 시각화합니다.
 +
