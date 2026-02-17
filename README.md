@@ -58,3 +58,31 @@ python3 a_star_visualization.py --no-show --output final.png
 ```bash
 pip install matplotlib numpy
 ```
+
+## PR에 갈등(merge conflict)이 생긴 이유
+
+이 저장소에서 충돌이 발생하는 가장 흔한 이유는 아래와 같습니다.
+
+1. 같은 파일의 같은 줄 근처를 서로 다른 브랜치에서 동시에 수정했을 때
+   - 예: `README.md`, `a_star_visualization.py`를 메인 브랜치와 작업 브랜치에서 각각 편집
+2. 한쪽은 파일을 삭제/이동했는데 다른 쪽은 같은 파일을 수정했을 때
+3. 브랜치가 오래되어 기준 브랜치(`main`) 최신 커밋을 반영하지 못했을 때
+
+권장 해결 순서:
+
+```bash
+git fetch origin
+git rebase origin/main
+# 충돌 파일 수정
+git add <충돌 파일>
+git rebase --continue
+```
+
+또는 merge 전략을 사용할 수도 있습니다.
+
+```bash
+git fetch origin
+git merge origin/main
+```
+
+충돌 자체는 "코드가 틀렸다"는 의미가 아니라, Git이 자동으로 어느 변경을 선택해야 할지 판단할 수 없다는 의미입니다.
