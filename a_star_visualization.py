@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A* pathfinding visualization on a 50x50 maze grid."""
+"""A* pathfinding process visualization on a maze grid."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ import argparse
 import heapq
 import random
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Iterator, List, Optional, Tuple
 
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
@@ -23,7 +25,7 @@ class PrioritizedNode:
 
 
 class MazeAStarVisualizer:
-    """Generate a maze and visualize A* execution with color-coded states."""
+    """Generate a maze and visualize every A* step with color-coded states."""
 
     FREE = 0
     WALL = 1
@@ -32,6 +34,7 @@ class MazeAStarVisualizer:
     PATH = 4
     START = 5
     GOAL = 6
+    CURRENT = 7
 
     def __init__(self, size: int = 50, wall_probability: float = 0.28, seed: Optional[int] = None):
         self.size = size
@@ -39,12 +42,10 @@ class MazeAStarVisualizer:
         self.rng = random.Random(seed)
         self.start: GridPos = (1, 1)
         self.goal: GridPos = (size - 2, size - 2)
-
         self.base_maze = self._create_solvable_maze()
 
     def _create_random_maze(self) -> np.ndarray:
         maze = np.zeros((self.size, self.size), dtype=np.int8)
-
         for row in range(self.size):
             for col in range(self.size):
                 if row in (0, self.size - 1) or col in (0, self.size - 1):
@@ -73,9 +74,7 @@ class MazeAStarVisualizer:
                 return True
 
             for neighbor in self._neighbors(current):
-                if neighbor in visited:
-                    continue
-                if maze[neighbor] == self.WALL:
+                if neighbor in visited or maze[neighbor] == self.WALL:
                     continue
                 visited.add(neighbor)
                 queue.append(neighbor)
@@ -93,6 +92,7 @@ class MazeAStarVisualizer:
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def a_star_steps(self) -> Iterator[np.ndarray]:
+        """Yield each search step so users can observe the running process, not just the final result."""
         grid = self.base_maze.copy()
         grid[self.start] = self.START
         grid[self.goal] = self.GOAL
@@ -111,6 +111,11 @@ class MazeAStarVisualizer:
                 continue
 
             open_set.remove(current)
+            step_grid = grid.copy()
+            if current not in (self.start, self.goal):
+                step_grid[current] = self.CURRENT
+            yield self._mark_start_goal(step_grid)
+
             if current != self.start:
                 closed_set.add(current)
                 grid[current] = self.CLOSED
@@ -119,7 +124,7 @@ class MazeAStarVisualizer:
                 for step in self._reconstruct_path(came_from, current):
                     if step not in (self.start, self.goal):
                         grid[step] = self.PATH
-                        yield grid.copy()
+                        yield self._mark_start_goal(grid.copy())
                 return
 
             for neighbor in self._neighbors(current):
@@ -133,13 +138,16 @@ class MazeAStarVisualizer:
                     f_score = tentative_g + self.heuristic(neighbor, self.goal)
                     heapq.heappush(open_heap, PrioritizedNode(f_score, neighbor))
 
-                    if neighbor != self.goal and neighbor != self.start:
+                    if neighbor not in (self.start, self.goal):
                         grid[neighbor] = self.OPEN
                     open_set.add(neighbor)
 
-            grid[self.start] = self.START
-            grid[self.goal] = self.GOAL
-            yield grid.copy()
+            yield self._mark_start_goal(grid.copy())
+
+    def _mark_start_goal(self, grid: np.ndarray) -> np.ndarray:
+        grid[self.start] = self.START
+        grid[self.goal] = self.GOAL
+        return grid
 
     def _reconstruct_path(self, came_from: dict[GridPos, GridPos], current: GridPos) -> List[GridPos]:
         path = []
@@ -148,8 +156,8 @@ class MazeAStarVisualizer:
             path.append(current)
         return list(reversed(path))
 
-    def visualize(self, interval: float = 0.02, output: Optional[str] = None, show: bool = True) -> None:
-        cmap = ListedColormap(
+    def _create_colormap(self) -> ListedColormap:
+        return ListedColormap(
             [
                 "#ffffff",  # FREE
                 "#1f2937",  # WALL
@@ -158,34 +166,59 @@ class MazeAStarVisualizer:
                 "#22c55e",  # PATH
                 "#f59e0b",  # START
                 "#ef4444",  # GOAL
+                "#a855f7",  # CURRENT
             ]
         )
 
+    def visualize(self, interval: float = 0.02, output: Optional[str] = None, show: bool = True) -> None:
+        """Show live animation and optionally export process animation (gif/mp4) or final image (png)."""
+        frames = list(self.a_star_steps())
+
         fig, ax = plt.subplots(figsize=(8, 8))
-        ax.set_title("A* Algorithm Visualization (50x50 maze)")
+        ax.set_title("A* Algorithm Process Visualization")
         ax.set_xticks([])
         ax.set_yticks([])
 
-        image = ax.imshow(self.base_maze, cmap=cmap, vmin=0, vmax=6)
-        for frame in self.a_star_steps():
+        image = ax.imshow(frames[0], cmap=self._create_colormap(), vmin=0, vmax=7)
+
+        def update(frame: np.ndarray):
             image.set_data(frame)
-            if show:
-                plt.pause(interval)
+            return (image,)
+
+        interval_ms = max(1, int(interval * 1000))
+        ani = animation.FuncAnimation(
+            fig,
+            update,
+            frames=frames,
+            interval=interval_ms,
+            blit=True,
+            repeat=False,
+        )
 
         if output:
-            fig.savefig(output, dpi=150, bbox_inches="tight")
+            suffix = Path(output).suffix.lower()
+            if suffix in {".gif", ".mp4"}:
+                ani.save(output)
+            else:
+                fig.savefig(output, dpi=150, bbox_inches="tight")
+
         if show:
             plt.show()
         plt.close(fig)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Visualize A* pathfinding on a random maze.")
+    parser = argparse.ArgumentParser(description="Visualize A* pathfinding process on a random maze.")
     parser.add_argument("--size", type=int, default=50, help="Grid size (default: 50)")
     parser.add_argument("--wall-prob", type=float, default=0.28, help="Wall density 0.0~1.0")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--interval", type=float, default=0.02, help="Animation delay in seconds")
-    parser.add_argument("--output", type=str, default=None, help="Optional image output path")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Output file path (.gif/.mp4 for process animation, others for final frame image)",
+    )
     parser.add_argument("--no-show", action="store_true", help="Run without opening GUI window")
     return parser.parse_args()
 
