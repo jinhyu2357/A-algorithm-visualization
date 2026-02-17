@@ -58,38 +58,3 @@ A* 알고리즘 시각화 (Python)
 +```bash
 +pip install matplotlib numpy
 +```
-+
-+## PR conflict(갈등)가 생기는 이유
-+
-+`PR conflict`는 **두 브랜치의 변경을 Git이 자동으로 합칠 수 없을 때** 발생합니다.
-+즉, 코드가 반드시 잘못된 것이 아니라 "어느 버전을 남길지 사람이 결정해야 하는 상황"입니다.
-+
-+이 저장소 기준으로 자주 발생하는 케이스:
-+
-+1. **같은 파일의 같은 위치를 동시에 수정**
-+   - 예: `README.md`, `a_star_visualization.py`의 동일한 문단/함수 라인을 각각 수정
-+2. **한쪽은 파일 삭제/이동, 다른 쪽은 같은 파일 수정**
-+3. **브랜치가 오래되어 `main` 최신 커밋을 반영하지 못한 상태에서 PR 생성**
-+
-+### 빠른 해결 방법 (rebase 권장)
-+
-+```bash
-+git fetch origin
-+git rebase origin/main
-+# 충돌 발생 시 파일 열어서 <<<<<<<, =======, >>>>>>> 구간 정리
-+git add <충돌 파일>
-+git rebase --continue
-+```
-+
-+### 대안 (merge)
-+
-+```bash
-+git fetch origin
-+git merge origin/main
-+```
-+
-+### 충돌 예방 팁
-+
-+- PR 올리기 전에 `git fetch origin && git rebase origin/main`으로 최신화
-+- 큰 변경은 작은 단위 커밋/PR로 나누기
-+- 팀에서 자주 바꾸는 파일(`README.md`, 핵심 로직 파일)은 먼저 동기화 후 작업 시작
