@@ -40,9 +40,29 @@ class MazeAStarVisualizer:
         self.size = size
         self.wall_probability = wall_probability
         self.rng = random.Random(seed)
-        self.start: GridPos = (1, 1)
-        self.goal: GridPos = (size - 2, size - 2)
+        self.start, self.goal = self._pick_start_goal(min_distance=10)
         self.base_maze = self._create_solvable_maze()
+
+    def _pick_start_goal(self, min_distance: int) -> Tuple[GridPos, GridPos]:
+        if self.size < 3:
+            raise ValueError("Grid size must be at least 3.")
+
+        candidates = [(row, col) for row in range(1, self.size - 1) for col in range(1, self.size - 1)]
+        if len(candidates) < 2:
+            raise ValueError("Not enough free cells to place start and goal.")
+
+        max_distance = (self.size - 2) * 2
+        required_distance = min(min_distance, max_distance)
+
+        for _ in range(1000):
+            start = self.rng.choice(candidates)
+            goal = self.rng.choice(candidates)
+            if start == goal:
+                continue
+            if self.heuristic(start, goal) >= required_distance:
+                return start, goal
+
+        raise RuntimeError("Could not choose start/goal with required distance. Try increasing grid size.")
 
     def _create_random_maze(self) -> np.ndarray:
         maze = np.zeros((self.size, self.size), dtype=np.int8)
