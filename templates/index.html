@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A* Algorithm Web Visualizer</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>A* 알고리즘 시각화 웹페이지</h1>
+      <p>파라미터를 조정하고 최종 탐색 결과 이미지를 생성하세요.</p>
+
+      <form method="post" class="control-panel">
+        <label>
+          Grid Size
+          <input type="number" name="size" min="10" max="100" value="{{ size }}" required />
+        </label>
+
+        <label>
+          Wall Probability (0.0~0.8 권장)
+          <input type="number" name="wall_prob" min="0" max="0.8" step="0.01" value="{{ wall_prob }}" required />
+        </label>
+
+        <label>
+          Seed (선택)
+          <input type="number" name="seed" value="{{ seed }}" placeholder="랜덤" />
+        </label>
+
+        <button type="submit">미로 생성</button>
+      </form>
+
+      <section class="preview">
+        <h2>미리보기</h2>
+        <img src="{{ preview_url }}" alt="A* result preview" />
+      </section>
+    </main>
+  </body>
+</html>

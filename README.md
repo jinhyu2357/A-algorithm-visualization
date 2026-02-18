@@ -1,4 +1,4 @@
-A* 알고리즘 시각화 (Python)
+A* 알고리즘 시각화 (Python + FastAPI)
 
 50×50 미로에서 시작점과 도착점을 설정하고, **A* 알고리즘이 탐색하는 과정 전체**를 색상으로 시각화합니다.
 
@@ -16,8 +16,11 @@ A* 알고리즘 시각화 (Python)
    - 초록색: 최종 경로
    - 주황색: 시작점
    - 빨간색: 도착점
+5. FastAPI 웹페이지에서 파라미터를 입력하고 결과 이미지를 즉시 미리보기
 
 ## 실행 방법
+
+### 1) CLI 시각화 실행
 
 ```bash
 python3 a_star_visualization.py
@@ -28,6 +31,15 @@ python3 a_star_visualization.py
 ```bash
 python3 a_star_visualization.py --size 50 --wall-prob 0.30 --seed 7 --interval 0.01
 ```
+
+### 2) FastAPI 웹서버 실행
+
+```bash
+uvicorn app:app --reload
+```
+
+브라우저에서 `http://127.0.0.1:8000` 접속 후,
+그리드 크기/벽 밀도/시드를 입력해 미로 결과 이미지를 확인할 수 있습니다.
 
 ## 결과 저장
 
@@ -52,9 +64,13 @@ python3 a_star_visualization.py --no-show --output final.png
 - Python 3.10+
 - `matplotlib`
 - `numpy`
+- `fastapi`
+- `uvicorn`
+- `jinja2`
+- `python-multipart`
 
 설치:
 
 ```bash
-pip install matplotlib numpy
+pip install -r requirements.txt
 ```
