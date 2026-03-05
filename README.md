@@ -1,5 +1,7 @@
 codex가 README.md를 정리했음을 알립니다.  
 a star 알고리즘에 벡터를 적용함.  
+뭔지 모를 오류가 기다리고 있음  
+실험버전  
 
 original A* 알고리즘 시각화 (Python + FastAPI)
 
