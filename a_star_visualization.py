@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
-"""A* pathfinding process visualization on a maze grid."""
-
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import heapq
 import random
 from dataclasses import dataclass
@@ -16,11 +14,12 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 
 GridPos = Tuple[int, int]
+Priority = Tuple[float, float, float]
 
 
 @dataclass(order=True)
 class PrioritizedNode:
-    priority: float
+    priority: Priority
     position: GridPos
 
 
@@ -36,22 +35,111 @@ class MazeAStarVisualizer:
     GOAL = 6
     CURRENT = 7
 
-    def __init__(self, size: int = 50, wall_probability: float = 0.28, seed: Optional[int] = None):
-        self.size = size
-        self.wall_probability = wall_probability
+    def __init__(
+        self,
+        size: int = 50,
+        wall_probability: float = 0.28,
+        seed: Optional[int] = None,
+        *,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        wall_grid: Optional[np.ndarray] = None,
+        start: Optional[GridPos] = None,
+        goal: Optional[GridPos] = None,
+    ):
         self.rng = random.Random(seed)
-        self.start, self.goal = self._pick_start_goal(min_distance=10)
-        self.base_maze = self._create_solvable_maze()
+        self.wall_probability = wall_probability
+        if (start is None) != (goal is None):
+            raise ValueError("Both `start` and `goal` must be provided together.")
+
+        if wall_grid is not None:
+            normalized_grid = self._normalize_wall_grid(wall_grid)
+            self.height, self.width = normalized_grid.shape
+            if width is not None and int(width) != self.width:
+                raise ValueError("`width` does not match custom wall grid width.")
+            if height is not None and int(height) != self.height:
+                raise ValueError("`height` does not match custom wall grid height.")
+            self.base_maze = normalized_grid
+            if start is not None and goal is not None:
+                self.start, self.goal = self._validate_manual_start_goal(start=start, goal=goal, maze=self.base_maze)
+            else:
+                self.start, self.goal = self._pick_start_goal_for_fixed_maze(self.base_maze, min_distance=10)
+        else:
+            self.width = int(width) if width is not None else int(size)
+            self.height = int(height) if height is not None else int(size)
+            if self.width < 3 or self.height < 3:
+                raise ValueError("Grid width/height must both be at least 3.")
+            if start is not None and goal is not None:
+                self.start, self.goal = self._validate_manual_start_goal(start=start, goal=goal, maze=None)
+            else:
+                self.start, self.goal = self._pick_start_goal(min_distance=10)
+            self.base_maze = self._create_solvable_maze()
+
+        self.goal_direction = self._direction_vector(self.start, self.goal)
+
+    def _normalize_wall_grid(self, wall_grid: np.ndarray) -> np.ndarray:
+        if wall_grid.ndim != 2:
+            raise ValueError("Custom wall grid must be a 2D array.")
+        normalized = wall_grid.astype(np.int8, copy=True)
+        if normalized.shape[0] <= 0 or normalized.shape[1] <= 0:
+            raise ValueError("Custom wall grid cannot be empty.")
+        if not np.isin(normalized, [self.FREE, self.WALL]).all():
+            raise ValueError("Custom wall grid values must be 0 (free) or 1 (wall).")
+        return normalized
+
+    def _normalize_position(self, position: GridPos, name: str) -> GridPos:
+        try:
+            row_raw, col_raw = position
+        except Exception as exc:
+            raise ValueError(f"`{name}` must be a (row, col) pair.") from exc
+
+        if isinstance(row_raw, bool) or isinstance(col_raw, bool):
+            raise ValueError(f"`{name}` row/col must be integers.")
+        if isinstance(row_raw, float) and not row_raw.is_integer():
+            raise ValueError(f"`{name}` row/col must be integers.")
+        if isinstance(col_raw, float) and not col_raw.is_integer():
+            raise ValueError(f"`{name}` row/col must be integers.")
+
+        try:
+            row = int(row_raw)
+            col = int(col_raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"`{name}` row/col must be integers.") from exc
+
+        if row < 0 or col < 0 or row >= self.height or col >= self.width:
+            raise ValueError(
+                f"`{name}` position {(row, col)} is out of bounds for grid size {self.height}x{self.width}."
+            )
+        return (row, col)
+
+    def _validate_manual_start_goal(
+        self,
+        start: GridPos,
+        goal: GridPos,
+        maze: Optional[np.ndarray],
+    ) -> Tuple[GridPos, GridPos]:
+        normalized_start = self._normalize_position(start, "start")
+        normalized_goal = self._normalize_position(goal, "goal")
+
+        if normalized_start == normalized_goal:
+            raise ValueError("Start and goal must be different positions.")
+
+        if maze is not None:
+            if maze[normalized_start] == self.WALL:
+                raise ValueError("`start` must be on a free cell (0) in the current map.")
+            if maze[normalized_goal] == self.WALL:
+                raise ValueError("`goal` must be on a free cell (0) in the current map.")
+            if not self._has_path(maze, normalized_start, normalized_goal):
+                raise ValueError("No path exists between the provided start and goal positions.")
+
+        return normalized_start, normalized_goal
 
     def _pick_start_goal(self, min_distance: int) -> Tuple[GridPos, GridPos]:
-        if self.size < 3:
-            raise ValueError("Grid size must be at least 3.")
-
-        candidates = [(row, col) for row in range(1, self.size - 1) for col in range(1, self.size - 1)]
+        candidates = [(row, col) for row in range(1, self.height - 1) for col in range(1, self.width - 1)]
         if len(candidates) < 2:
             raise ValueError("Not enough free cells to place start and goal.")
 
-        max_distance = (self.size - 2) * 2
+        max_distance = (self.height - 2) + (self.width - 2)
         required_distance = min(min_distance, max_distance)
 
         for _ in range(1000):
@@ -64,11 +152,39 @@ class MazeAStarVisualizer:
 
         raise RuntimeError("Could not choose start/goal with required distance. Try increasing grid size.")
 
+    def _pick_start_goal_for_fixed_maze(self, maze: np.ndarray, min_distance: int) -> Tuple[GridPos, GridPos]:
+        free_cells = [tuple(int(idx) for idx in pos) for pos in np.argwhere(maze == self.FREE)]
+        if len(free_cells) < 2:
+            raise ValueError("Custom map must include at least two free cells for start and goal.")
+
+        max_distance = (self.height - 1) + (self.width - 1)
+        required_distance = min(min_distance, max_distance)
+
+        for _ in range(3000):
+            start = self.rng.choice(free_cells)
+            goal = self.rng.choice(free_cells)
+            if start == goal:
+                continue
+            if self.heuristic(start, goal) < required_distance:
+                continue
+            if self._has_path(maze, start, goal):
+                return start, goal
+
+        for _ in range(3000):
+            start = self.rng.choice(free_cells)
+            goal = self.rng.choice(free_cells)
+            if start == goal:
+                continue
+            if self._has_path(maze, start, goal):
+                return start, goal
+
+        raise RuntimeError("Custom map does not contain any reachable start/goal pair.")
+
     def _create_random_maze(self) -> np.ndarray:
-        maze = np.zeros((self.size, self.size), dtype=np.int8)
-        for row in range(self.size):
-            for col in range(self.size):
-                if row in (0, self.size - 1) or col in (0, self.size - 1):
+        maze = np.zeros((self.height, self.width), dtype=np.int8)
+        for row in range(self.height):
+            for col in range(self.width):
+                if row in (0, self.height - 1) or col in (0, self.width - 1):
                     maze[row, col] = self.WALL
                 elif self.rng.random() < self.wall_probability:
                     maze[row, col] = self.WALL
@@ -85,11 +201,11 @@ class MazeAStarVisualizer:
         raise RuntimeError("Could not generate a solvable maze. Try lowering wall density.")
 
     def _has_path(self, maze: np.ndarray, start: GridPos, goal: GridPos) -> bool:
-        queue: List[GridPos] = [start]
+        queue: deque[GridPos] = deque([start])
         visited = {start}
 
         while queue:
-            current = queue.pop(0)
+            current = queue.popleft()
             if current == goal:
                 return True
 
@@ -104,12 +220,33 @@ class MazeAStarVisualizer:
         row, col = position
         for d_row, d_col in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             n_row, n_col = row + d_row, col + d_col
-            if 0 <= n_row < self.size and 0 <= n_col < self.size:
+            if 0 <= n_row < self.height and 0 <= n_col < self.width:
                 yield (n_row, n_col)
 
     @staticmethod
     def heuristic(a: GridPos, b: GridPos) -> int:
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    @staticmethod
+    def _direction_vector(start: GridPos, goal: GridPos) -> Tuple[float, float]:
+        d_row = goal[0] - start[0]
+        d_col = goal[1] - start[1]
+        norm = (d_row**2 + d_col**2) ** 0.5
+        if norm == 0:
+            return (0.0, 0.0)
+        return (d_row / norm, d_col / norm)
+
+    def _direction_penalty(self, current: GridPos, neighbor: GridPos) -> float:
+        step_row = neighbor[0] - current[0]
+        step_col = neighbor[1] - current[1]
+        alignment = step_row * self.goal_direction[0] + step_col * self.goal_direction[1]
+        # Lower penalty means the step is better aligned with the start->goal direction vector.
+        return 1.0 - alignment
+
+    def _ordered_neighbors(self, position: GridPos) -> List[GridPos]:
+        neighbors = list(self._neighbors(position))
+        neighbors.sort(key=lambda neighbor: self._direction_penalty(position, neighbor))
+        return neighbors
 
     def a_star_steps(self) -> Iterator[np.ndarray]:
         """Yield each search step so users can observe the running process, not just the final result."""
@@ -117,7 +254,8 @@ class MazeAStarVisualizer:
         grid[self.start] = self.START
         grid[self.goal] = self.GOAL
 
-        open_heap: List[PrioritizedNode] = [PrioritizedNode(0, self.start)]
+        start_h = self.heuristic(self.start, self.goal)
+        open_heap: List[PrioritizedNode] = [PrioritizedNode((start_h, 0.0, start_h), self.start)]
         g_score = {self.start: 0}
         came_from: dict[GridPos, GridPos] = {}
         open_set = {self.start}
@@ -147,7 +285,7 @@ class MazeAStarVisualizer:
                         yield self._mark_start_goal(grid.copy())
                 return
 
-            for neighbor in self._neighbors(current):
+            for neighbor in self._ordered_neighbors(current):
                 if self.base_maze[neighbor] == self.WALL or neighbor in closed_set:
                     continue
 
@@ -155,8 +293,10 @@ class MazeAStarVisualizer:
                 if tentative_g < g_score.get(neighbor, float("inf")):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g
-                    f_score = tentative_g + self.heuristic(neighbor, self.goal)
-                    heapq.heappush(open_heap, PrioritizedNode(f_score, neighbor))
+                    h_score = self.heuristic(neighbor, self.goal)
+                    f_score = tentative_g + h_score
+                    direction_penalty = self._direction_penalty(current, neighbor)
+                    heapq.heappush(open_heap, PrioritizedNode((f_score, direction_penalty, h_score), neighbor))
 
                     if neighbor not in (self.start, self.goal):
                         grid[neighbor] = self.OPEN
@@ -230,6 +370,8 @@ class MazeAStarVisualizer:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Visualize A* pathfinding process on a random maze.")
     parser.add_argument("--size", type=int, default=50, help="Grid size (default: 50)")
+    parser.add_argument("--width", type=int, default=None, help="Grid width (overrides --size)")
+    parser.add_argument("--height", type=int, default=None, help="Grid height (overrides --size)")
     parser.add_argument("--wall-prob", type=float, default=0.28, help="Wall density 0.0~1.0")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--interval", type=float, default=0.02, help="Animation delay in seconds")
@@ -245,7 +387,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    visualizer = MazeAStarVisualizer(size=args.size, wall_probability=args.wall_prob, seed=args.seed)
+    visualizer = MazeAStarVisualizer(
+        size=args.size,
+        width=args.width,
+        height=args.height,
+        wall_probability=args.wall_prob,
+        seed=args.seed,
+    )
     visualizer.visualize(interval=args.interval, output=args.output, show=not args.no_show)
 
 

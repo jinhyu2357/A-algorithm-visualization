@@ -8,32 +8,517 @@
   </head>
   <body>
     <main class="container">
-      <h1>A* 알고리즘 시각화 웹페이지</h1>
-      <p>파라미터를 조정하고 최종 탐색 결과 이미지를 생성하세요.</p>
+      <h1>A* 알고리즘 시각화</h1>
+      <p>파라미터를 조정하거나 커스텀 맵(JSON)을 편집해서 A* 탐색 과정을 확인하세요.</p>
 
-      <form method="post" class="control-panel">
+      <form method="post" class="control-panel" id="main-form">
         <label>
           Grid Size
           <input type="number" name="size" min="10" max="100" value="{{ size }}" required />
         </label>
 
         <label>
-          Wall Probability (0.0~0.4 권장)
+          Wall Probability (0.0 ~ 0.8)
           <input type="number" name="wall_prob" min="0" max="0.8" step="0.01" value="{{ wall_prob }}" required />
         </label>
 
         <label>
           Seed (선택)
-          <input type="number" name="seed" value="{{ seed }}" placeholder="랜덤" />
+          <input type="number" name="seed" value="{{ seed }}" placeholder="seed" />
         </label>
+
+        <fieldset class="mode-selector">
+          <legend>Start / Goal 위치 (선택)</legend>
+          <div class="toolbar-row">
+            <label class="inline-field">
+              Start Row
+              <input type="number" name="start_row" min="0" step="1" value="{{ start_row }}" placeholder="auto" />
+            </label>
+            <label class="inline-field">
+              Start Col
+              <input type="number" name="start_col" min="0" step="1" value="{{ start_col }}" placeholder="auto" />
+            </label>
+          </div>
+          <div class="toolbar-row">
+            <label class="inline-field">
+              Goal Row
+              <input type="number" name="goal_row" min="0" step="1" value="{{ goal_row }}" placeholder="auto" />
+            </label>
+            <label class="inline-field">
+              Goal Col
+              <input type="number" name="goal_col" min="0" step="1" value="{{ goal_col }}" placeholder="auto" />
+            </label>
+          </div>
+          <small>좌표 입력칸 중 하나라도 비워두면 기존 자동 배치 방식으로 처리됩니다.</small>
+        </fieldset>
+
+        <label class="speed-control">
+          애니메이션 속도 (<span id="animation-speed-label">{{ animation_speed }}</span>x)
+          <input
+            type="range"
+            name="animation_speed"
+            min="0.25"
+            max="4"
+            step="0.25"
+            value="{{ animation_speed }}"
+            oninput="document.getElementById('animation-speed-label').textContent = Number(this.value).toFixed(2).replace(/\.00$/, '')"
+          />
+          <small>값이 클수록 애니메이션이 빠르게 재생됩니다.</small>
+        </label>
+
+        <fieldset class="mode-selector">
+          <legend>표시 모드</legend>
+          <label class="inline-option">
+            <input
+              type="radio"
+              name="view_mode"
+              value="animation"
+              {% if view_mode == "animation" %}checked{% endif %}
+            />
+            탐색 과정을 애니메이션으로 보기
+          </label>
+          <label class="inline-option">
+            <input type="radio" name="view_mode" value="result" {% if view_mode == "result" %}checked{% endif %} />
+            최종 결과만 보기
+          </label>
+        </fieldset>
+
+        <label class="custom-map-input">
+          커스텀 맵 JSON (선택)
+          <textarea
+            id="custom-map-textarea"
+            name="custom_map"
+            rows="8"
+            placeholder='{"n":6,"k":5,"walls":[[0,1,0,0,0,0],[0,1,0,1,1,0],[0,0,0,0,1,0],[1,1,0,0,0,0],[0,0,0,1,0,0]]}'
+          >{{ custom_map }}</textarea>
+          <small>
+            `n`: 가로 칸 수, `k`: 세로 칸 수, `walls`: 0/1 배열(벽은 1). `walls`는 `k x n` 2차원 배열 또는 `n*k`
+            길이의 1차원 배열을 지원합니다.
+          </small>
+        </label>
+
+        <section class="map-editor" aria-labelledby="map-editor-title">
+          <h3 id="map-editor-title">마우스 맵 에디터</h3>
+
+          <div class="map-editor-toolbar">
+            <div class="toolbar-row">
+              <label class="inline-field">
+                JSON 파일 불러오기
+                <input type="file" id="custom-map-file" accept=".json,application/json,text/json" />
+              </label>
+              <button type="button" id="load-map-button">JSON 적용</button>
+              <button type="button" id="download-map-button">JSON 저장</button>
+            </div>
+
+            <div class="toolbar-row">
+              <label class="inline-field">
+                가로
+                <input type="number" id="editor-width" min="1" max="200" step="1" />
+              </label>
+              <label class="inline-field">
+                세로
+                <input type="number" id="editor-height" min="1" max="200" step="1" />
+              </label>
+              <button type="button" id="new-map-button">새 맵 생성</button>
+            </div>
+
+            <p id="map-editor-error" class="editor-error" hidden></p>
+          </div>
+
+          <div class="canvas-wrap">
+            <canvas id="map-editor-canvas" aria-label="커스텀 맵 편집 캔버스"></canvas>
+          </div>
+          <small class="editor-help">클릭 또는 드래그로 벽(1)/빈칸(0)을 토글합니다.</small>
+        </section>
+
+        <p class="hint">커스텀 맵이 입력되면 Grid Size/Wall Probability 대신 커스텀 맵이 우선 적용됩니다.</p>
+
+        {% if error_message %}
+          <p class="error-message">{{ error_message }}</p>
+        {% endif %}
 
         <button type="submit">미로 생성</button>
       </form>
 
       <section class="preview">
-        <h2>미리보기</h2>
+        <h2>{% if view_mode == "animation" %}탐색 애니메이션{% else %}최종 결과{% endif %}</h2>
         <img src="{{ preview_url }}" alt="A* result preview" />
       </section>
     </main>
+
+    <script>
+      (() => {
+        const customMapTextarea = document.getElementById("custom-map-textarea");
+        const customMapFile = document.getElementById("custom-map-file");
+        const loadMapButton = document.getElementById("load-map-button");
+        const downloadMapButton = document.getElementById("download-map-button");
+        const newMapButton = document.getElementById("new-map-button");
+        const editorWidthInput = document.getElementById("editor-width");
+        const editorHeightInput = document.getElementById("editor-height");
+        const editorError = document.getElementById("map-editor-error");
+        const canvas = document.getElementById("map-editor-canvas");
+        const sizeInput = document.querySelector('input[name="size"]');
+
+        if (!(customMapTextarea instanceof HTMLTextAreaElement) || !(canvas instanceof HTMLCanvasElement)) {
+          return;
+        }
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          return;
+        }
+
+        const state = {
+          width: 0,
+          height: 0,
+          walls: [],
+          cellSize: 12,
+          isDrawing: false,
+          activePointerId: null,
+          dragVisited: new Set(),
+        };
+
+        const MAX_CANVAS_PX = 720;
+        const MIN_CELL_SIZE = 6;
+
+        function showEditorError(message) {
+          if (!(editorError instanceof HTMLElement)) {
+            return;
+          }
+          if (!message) {
+            editorError.hidden = true;
+            editorError.textContent = "";
+            return;
+          }
+          editorError.hidden = false;
+          editorError.textContent = message;
+        }
+
+        function parsePositiveInt(raw, fieldName) {
+          if (typeof raw === "string" && raw.trim() === "") {
+            throw new Error(fieldName + " value is empty.");
+          }
+          const value = Number(raw);
+          if (!Number.isInteger(value) || value <= 0) {
+            throw new Error(fieldName + " must be an integer greater than 0.");
+          }
+          return value;
+        }
+
+        function parseWallValue(raw) {
+          const value = Number(raw);
+          if (!Number.isInteger(value) || (value !== 0 && value !== 1)) {
+            throw new Error("walls values must be 0 or 1.");
+          }
+          return value;
+        }
+
+        function normalizeMapPayload(payload) {
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+            throw new Error("JSON root must be an object.");
+          }
+
+          const widthRaw = Object.hasOwn(payload, "n") ? payload.n : payload.width;
+          const heightRaw = Object.hasOwn(payload, "k") ? payload.k : payload.height;
+
+          if (widthRaw === undefined) {
+            throw new Error("`n` (width) is required.");
+          }
+          if (heightRaw === undefined) {
+            throw new Error("`k` (height) is required.");
+          }
+
+          const width = parsePositiveInt(widthRaw, "n");
+          const height = parsePositiveInt(heightRaw, "k");
+
+          if (!Object.hasOwn(payload, "walls") || !Array.isArray(payload.walls)) {
+            throw new Error("`walls` array is required.");
+          }
+
+          const rawWalls = payload.walls;
+          const hasRowArrays = rawWalls.some((row) => Array.isArray(row));
+          let walls;
+
+          if (hasRowArrays) {
+            if (!rawWalls.every((row) => Array.isArray(row))) {
+              throw new Error("`walls` must be consistently 1D or 2D.");
+            }
+            if (rawWalls.length !== height) {
+              throw new Error("2D `walls` row count must match k.");
+            }
+            walls = rawWalls.map((row) => {
+              if (row.length !== width) {
+                throw new Error("2D `walls` column count must match n.");
+              }
+              return row.map(parseWallValue);
+            });
+          } else {
+            const expectedLength = width * height;
+            if (rawWalls.length !== expectedLength) {
+              throw new Error("1D `walls` length must equal n*k.");
+            }
+            walls = [];
+            for (let row = 0; row < height; row += 1) {
+              const start = row * width;
+              walls.push(rawWalls.slice(start, start + width).map(parseWallValue));
+            }
+          }
+
+          return { n: width, k: height, walls };
+        }
+
+        function emptyMap(width, height) {
+          return {
+            n: width,
+            k: height,
+            walls: Array.from({ length: height }, () => Array.from({ length: width }, () => 0)),
+          };
+        }
+
+        function serializedMap() {
+          return JSON.stringify({ n: state.width, k: state.height, walls: state.walls }, null, 2);
+        }
+
+        function syncTextarea() {
+          customMapTextarea.value = serializedMap();
+        }
+
+        function computeCellSize(width, height) {
+          const maxDim = Math.max(width, height, 1);
+          return Math.max(MIN_CELL_SIZE, Math.floor(MAX_CANVAS_PX / maxDim));
+        }
+
+        function drawCell(row, col) {
+          const x = col * state.cellSize;
+          const y = row * state.cellSize;
+          const fill = state.walls[row][col] === 1 ? "#111827" : "#ffffff";
+
+          ctx.fillStyle = fill;
+          ctx.fillRect(x, y, state.cellSize, state.cellSize);
+
+          ctx.strokeStyle = "#d1d5db";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, state.cellSize - 1, state.cellSize - 1);
+        }
+
+        function redrawCanvas() {
+          canvas.width = state.width * state.cellSize;
+          canvas.height = state.height * state.cellSize;
+          for (let row = 0; row < state.height; row += 1) {
+            for (let col = 0; col < state.width; col += 1) {
+              drawCell(row, col);
+            }
+          }
+        }
+
+        function applyMap(map, syncText = true) {
+          state.width = map.n;
+          state.height = map.k;
+          state.walls = map.walls.map((row) => row.slice());
+          state.cellSize = computeCellSize(state.width, state.height);
+
+          if (editorWidthInput instanceof HTMLInputElement) {
+            editorWidthInput.value = String(state.width);
+          }
+          if (editorHeightInput instanceof HTMLInputElement) {
+            editorHeightInput.value = String(state.height);
+          }
+
+          redrawCanvas();
+          if (syncText) {
+            syncTextarea();
+          }
+          showEditorError("");
+        }
+
+        function parseTextareaMap() {
+          const rawText = customMapTextarea.value.trim();
+          if (!rawText) {
+            throw new Error("JSON is empty.");
+          }
+          let payload;
+          try {
+            payload = JSON.parse(rawText);
+          } catch (error) {
+            throw new Error("Invalid JSON syntax: " + error.message);
+          }
+          return normalizeMapPayload(payload);
+        }
+
+        function eventToCell(event) {
+          const rect = canvas.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) {
+            return null;
+          }
+          if (
+            event.clientX < rect.left ||
+            event.clientX >= rect.right ||
+            event.clientY < rect.top ||
+            event.clientY >= rect.bottom
+          ) {
+            return null;
+          }
+
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          const x = (event.clientX - rect.left) * scaleX;
+          const y = (event.clientY - rect.top) * scaleY;
+          const col = Math.floor(x / state.cellSize);
+          const row = Math.floor(y / state.cellSize);
+
+          if (row < 0 || col < 0 || row >= state.height || col >= state.width) {
+            return null;
+          }
+          return { row, col };
+        }
+
+        function toggleCell(row, col) {
+          const cellKey = row + "," + col;
+          if (state.dragVisited.has(cellKey)) {
+            return;
+          }
+          state.dragVisited.add(cellKey);
+          state.walls[row][col] = state.walls[row][col] === 1 ? 0 : 1;
+          drawCell(row, col);
+          syncTextarea();
+        }
+
+        function stopDrawing(pointerId) {
+          if (!state.isDrawing) {
+            return;
+          }
+          if (pointerId !== null && state.activePointerId !== pointerId) {
+            return;
+          }
+          if (pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+            canvas.releasePointerCapture(pointerId);
+          }
+          state.isDrawing = false;
+          state.activePointerId = null;
+          state.dragVisited.clear();
+        }
+
+        canvas.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) {
+            return;
+          }
+          const cell = eventToCell(event);
+          if (!cell) {
+            return;
+          }
+          state.isDrawing = true;
+          state.activePointerId = event.pointerId;
+          state.dragVisited.clear();
+          canvas.setPointerCapture(event.pointerId);
+          toggleCell(cell.row, cell.col);
+          event.preventDefault();
+        });
+
+        canvas.addEventListener("pointermove", (event) => {
+          if (!state.isDrawing || state.activePointerId !== event.pointerId) {
+            return;
+          }
+          const cell = eventToCell(event);
+          if (!cell) {
+            return;
+          }
+          toggleCell(cell.row, cell.col);
+        });
+
+        canvas.addEventListener("pointerup", (event) => {
+          stopDrawing(event.pointerId);
+        });
+
+        canvas.addEventListener("pointercancel", (event) => {
+          stopDrawing(event.pointerId);
+        });
+
+        canvas.addEventListener("lostpointercapture", () => {
+          stopDrawing(null);
+        });
+
+        if (loadMapButton instanceof HTMLButtonElement) {
+          loadMapButton.addEventListener("click", () => {
+            try {
+              const map = parseTextareaMap();
+              applyMap(map, true);
+            } catch (error) {
+              showEditorError(error.message);
+            }
+          });
+        }
+
+        if (customMapFile instanceof HTMLInputElement) {
+          customMapFile.addEventListener("change", async () => {
+            const file = customMapFile.files && customMapFile.files[0];
+            if (!file) {
+              return;
+            }
+            try {
+              const fileText = await file.text();
+              customMapTextarea.value = fileText;
+              const map = parseTextareaMap();
+              applyMap(map, true);
+            } catch (error) {
+              showEditorError("Failed to load file: " + error.message);
+            } finally {
+              customMapFile.value = "";
+            }
+          });
+        }
+
+        if (downloadMapButton instanceof HTMLButtonElement) {
+          downloadMapButton.addEventListener("click", () => {
+            const blob = new Blob([serializedMap()], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = "custom-map.json";
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+          });
+        }
+
+        if (newMapButton instanceof HTMLButtonElement) {
+          newMapButton.addEventListener("click", () => {
+            try {
+              if (!(editorWidthInput instanceof HTMLInputElement) || !(editorHeightInput instanceof HTMLInputElement)) {
+                throw new Error("Map size inputs are unavailable.");
+              }
+              const width = parsePositiveInt(editorWidthInput.value, "width");
+              const height = parsePositiveInt(editorHeightInput.value, "height");
+              applyMap(emptyMap(width, height), true);
+            } catch (error) {
+              showEditorError(error.message);
+            }
+          });
+        }
+
+        const defaultSize = (() => {
+          if (!(sizeInput instanceof HTMLInputElement)) {
+            return 20;
+          }
+          const parsed = Number(sizeInput.value);
+          return Number.isInteger(parsed) && parsed > 0 ? parsed : 20;
+        })();
+
+        let initialized = false;
+        if (customMapTextarea.value.trim()) {
+          try {
+            const existingMap = parseTextareaMap();
+            applyMap(existingMap, true);
+            initialized = true;
+          } catch (error) {
+            showEditorError("Current custom_map could not be parsed. Please apply a valid JSON map. " + error.message);
+          }
+        }
+
+        if (!initialized) {
+          applyMap(emptyMap(defaultSize, defaultSize), false);
+        }
+      })();
+    </script>
   </body>
 </html>

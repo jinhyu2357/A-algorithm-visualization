@@ -41,6 +41,156 @@ input {
   border-radius: 8px;
 }
 
+textarea {
+  padding: 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+input[type="range"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  accent-color: #2563eb;
+}
+
+.speed-control small {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.custom-map-input small {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.mode-selector {
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.mode-selector legend {
+  padding: 0 0.35rem;
+  font-weight: 700;
+}
+
+.inline-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 500;
+}
+
+.inline-option + .inline-option {
+  margin-top: 0.45rem;
+}
+
+.inline-option input {
+  width: auto;
+  margin: 0;
+}
+
+.map-editor {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.map-editor h3 {
+  margin: 0;
+}
+
+.map-editor-toolbar {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.inline-field {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.inline-field input[type="file"] {
+  padding: 0.35rem;
+}
+
+.inline-field input[type="number"] {
+  width: 7rem;
+}
+
+.toolbar-row button {
+  margin-top: 0;
+}
+
+.canvas-wrap {
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#map-editor-canvas {
+  display: block;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.editor-help {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.editor-error {
+  margin: 0;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.error-message {
+  margin: 0;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-weight: 600;
+}
+
 button {
   margin-top: 0.25rem;
   width: fit-content;
@@ -65,4 +215,19 @@ button {
   max-width: 640px;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
+}
+
+@media (max-width: 640px) {
+  .toolbar-row {
+    align-items: stretch;
+  }
+
+  .toolbar-row button {
+    width: 100%;
+  }
+
+  .inline-field,
+  .inline-field input[type="number"] {
+    width: 100%;
+  }
 }
