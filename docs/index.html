@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A* Map Editor (GitHub Pages)</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background:#f8fafc; color:#0f172a; }
+      main { max-width: 980px; margin: 0 auto; background:#fff; padding:24px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.08);} 
+      h1 { margin-top:0; }
+      .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:end; }
+      label { display:flex; flex-direction:column; font-size:14px; gap:4px; }
+      input, button { font-size:14px; padding:6px 8px; }
+      .canvas-wrap { border:1px solid #cbd5e1; width:max-content; max-width:100%; overflow:auto; background:#fff; }
+      canvas { display:block; touch-action:none; }
+      .error { color:#b91c1c; min-height:1.2em; }
+      .help { color:#475569; }
+      textarea { width:100%; height:100px; margin-top:8px; font-family:monospace; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>A* 마우스 맵 에디터 (정적 배포용)</h1>
+      <p>벽(1)/빈칸(0) 맵 JSON을 마우스로 편집하고 저장할 수 있습니다.</p>
+
+      <div class="toolbar">
+        <label>가로 <input type="number" id="w" min="1" max="200" value="25" /></label>
+        <label>세로 <input type="number" id="h" min="1" max="200" value="25" /></label>
+        <button id="new">새 맵 생성</button>
+        <label>JSON 불러오기 <input type="file" id="file" accept=".json,application/json,text/json" /></label>
+        <button id="save">JSON 저장</button>
+      </div>
+
+      <div class="canvas-wrap"><canvas id="c"></canvas></div>
+      <p id="err" class="error"></p>
+      <p class="help">클릭/드래그로 벽 토글. 아래 JSON은 FastAPI 커스텀 맵 입력에 그대로 붙여넣을 수 있습니다.</p>
+      <textarea id="out" readonly></textarea>
+    </main>
+
+    <script>
+      const c = document.getElementById('c');
+      const ctx = c.getContext('2d');
+      const out = document.getElementById('out');
+      const err = document.getElementById('err');
+      const wInput = document.getElementById('w');
+      const hInput = document.getElementById('h');
+      const newBtn = document.getElementById('new');
+      const fileInput = document.getElementById('file');
+      const saveBtn = document.getElementById('save');
+
+      const state = { w: 25, h: 25, walls: [], cell: 16, draw:false, mode:1, seen:new Set() };
+
+      function showError(msg=''){ err.textContent = msg; }
+      function parseIntStrict(v, name){ const n = Number(v); if(!Number.isInteger(n)||n<1||n>200) throw new Error(`${name}는 1~200 정수여야 합니다.`); return n; }
+      function resizeCanvas(){ state.cell = Math.max(6, Math.floor(720/Math.max(state.w,state.h))); c.width = state.w*state.cell; c.height = state.h*state.cell; }
+      function resetWalls(){ state.walls = Array.from({length:state.h}, ()=>Array.from({length:state.w}, ()=>0)); }
+      function payload(){ return { n: state.w, k: state.h, walls: state.walls.flat() }; }
+      function syncOutput(){ out.value = JSON.stringify(payload()); }
+
+      function drawGrid(){
+        ctx.clearRect(0,0,c.width,c.height);
+        for(let r=0;r<state.h;r++) for(let col=0;col<state.w;col++){
+          ctx.fillStyle = state.walls[r][col]===1 ? '#334155':'#ffffff';
+          ctx.fillRect(col*state.cell, r*state.cell, state.cell, state.cell);
+        }
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        for(let x=0;x<=state.w;x++){ ctx.beginPath(); ctx.moveTo(x*state.cell+0.5,0); ctx.lineTo(x*state.cell+0.5,c.height); ctx.stroke(); }
+        for(let y=0;y<=state.h;y++){ ctx.beginPath(); ctx.moveTo(0,y*state.cell+0.5); ctx.lineTo(c.width,y*state.cell+0.5); ctx.stroke(); }
+      }
+
+      function applyAt(e){
+        const rect = c.getBoundingClientRect();
+        const x = Math.floor((e.clientX-rect.left)/state.cell);
+        const y = Math.floor((e.clientY-rect.top)/state.cell);
+        if(x<0||y<0||x>=state.w||y>=state.h) return;
+        const k = `${x},${y}`; if(state.seen.has(k)) return; state.seen.add(k);
+        state.walls[y][x]=state.mode;
+        drawGrid(); syncOutput();
+      }
+
+      c.addEventListener('pointerdown', e=>{
+        showError('');
+        const rect = c.getBoundingClientRect();
+        const x = Math.floor((e.clientX-rect.left)/state.cell);
+        const y = Math.floor((e.clientY-rect.top)/state.cell);
+        if(x<0||y<0||x>=state.w||y>=state.h) return;
+        state.mode = state.walls[y][x]===1 ? 0 : 1;
+        state.draw = true; state.seen.clear(); c.setPointerCapture(e.pointerId); applyAt(e);
+      });
+      c.addEventListener('pointermove', e=>{ if(state.draw) applyAt(e); });
+      c.addEventListener('pointerup', ()=>{ state.draw=false; state.seen.clear(); });
+      c.addEventListener('pointercancel', ()=>{ state.draw=false; state.seen.clear(); });
+
+      newBtn.addEventListener('click', ()=>{
+        try{ state.w=parseIntStrict(wInput.value,'가로'); state.h=parseIntStrict(hInput.value,'세로'); resizeCanvas(); resetWalls(); drawGrid(); syncOutput(); showError(''); }
+        catch(e){ showError(e.message); }
+      });
+
+      fileInput.addEventListener('change', async ()=>{
+        const f=fileInput.files?.[0]; if(!f) return;
+        try{
+          const data=JSON.parse(await f.text());
+          const w = parseIntStrict(data.n ?? data.width,'n');
+          const h = parseIntStrict(data.k ?? data.height,'k');
+          if(!Array.isArray(data.walls)) throw new Error('walls 배열이 필요합니다.');
+          const flat = data.walls.flat();
+          if(flat.length!==w*h) throw new Error('walls 길이는 n*k와 같아야 합니다.');
+          if(!flat.every(v=>v===0||v===1)) throw new Error('walls 값은 0 또는 1이어야 합니다.');
+          state.w=w; state.h=h; wInput.value=String(w); hInput.value=String(h); resizeCanvas();
+          state.walls = Array.from({length:h}, (_,r)=>flat.slice(r*w,(r+1)*w));
+          drawGrid(); syncOutput(); showError('');
+        }catch(e){ showError('불러오기 실패: '+e.message); }
+      });
+
+      saveBtn.addEventListener('click', ()=>{
+        const blob = new Blob([JSON.stringify(payload(), null, 2)], {type:'application/json'});
+        const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='custom_map.json'; a.click(); URL.revokeObjectURL(a.href);
+      });
+
+      resizeCanvas(); resetWalls(); drawGrid(); syncOutput();
+    </script>
+  </body>
+</html>
