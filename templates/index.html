@@ -176,6 +176,8 @@
           isDrawing: false,
           activePointerId: null,
           dragVisited: new Set(),
+          syncTimerId: null,
+          needsSync: false,
         };
 
         const MAX_CANVAS_PX = 720;
@@ -275,12 +277,45 @@
           };
         }
 
+        function flattenedWalls() {
+          const flattened = [];
+          for (let row = 0; row < state.height; row += 1) {
+            for (let col = 0; col < state.width; col += 1) {
+              flattened.push(state.walls[row][col]);
+            }
+          }
+          return flattened;
+        }
+
         function serializedMap() {
+          const totalCells = state.width * state.height;
+          if (totalCells >= 2500) {
+            return JSON.stringify({ n: state.width, k: state.height, walls: flattenedWalls() });
+          }
           return JSON.stringify({ n: state.width, k: state.height, walls: state.walls }, null, 2);
         }
 
+        function clearSyncTimer() {
+          if (state.syncTimerId !== null) {
+            window.clearTimeout(state.syncTimerId);
+            state.syncTimerId = null;
+          }
+        }
+
         function syncTextarea() {
+          clearSyncTimer();
           customMapTextarea.value = serializedMap();
+          state.needsSync = false;
+        }
+
+        function scheduleTextareaSync() {
+          state.needsSync = true;
+          if (state.syncTimerId !== null) {
+            return;
+          }
+          state.syncTimerId = window.setTimeout(() => {
+            syncTextarea();
+          }, 120);
         }
 
         function computeCellSize(width, height) {
@@ -380,7 +415,7 @@
           state.dragVisited.add(cellKey);
           state.walls[row][col] = state.walls[row][col] === 1 ? 0 : 1;
           drawCell(row, col);
-          syncTextarea();
+          scheduleTextareaSync();
         }
 
         function stopDrawing(pointerId) {
@@ -396,6 +431,9 @@
           state.isDrawing = false;
           state.activePointerId = null;
           state.dragVisited.clear();
+          if (state.needsSync) {
+            syncTextarea();
+          }
         }
 
         canvas.addEventListener("pointerdown", (event) => {
