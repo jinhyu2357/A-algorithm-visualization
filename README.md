@@ -49,3 +49,17 @@ cd "A-algorithm-visualization"
 ```bash
 pip install -r requirements.txt
 ```
+
+## GitHub Pages 배포 가능 범위
+
+- 현재 메인 기능(미로 생성 + A* 애니메이션 렌더링)은 `FastAPI` 서버와 Python 연산이 필요하므로 **GitHub Pages(정적 호스팅)에서 그대로 배포할 수 없습니다**.
+- 대신 마우스 맵 에디터는 정적 페이지로 분리해 `docs/index.html`에 추가했습니다. 이 페이지는 GitHub Pages에서 바로 배포 가능합니다.
+
+### 마우스 맵 에디터만 배포하는 방법
+
+1. GitHub 저장소의 **Settings → Pages**로 이동
+2. **Build and deployment**에서 Source를 **Deploy from a branch**로 선택
+3. Branch를 현재 브랜치(또는 `main`) + `/docs` 폴더로 지정
+4. 저장 후 배포 URL 접속
+
+배포된 에디터에서 JSON을 내려받아, 로컬 FastAPI 앱의 `Custom Map (JSON)` 입력에 넣어 사용할 수 있습니다.
