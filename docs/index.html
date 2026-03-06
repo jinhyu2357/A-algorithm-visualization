@@ -11,6 +11,8 @@
       .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:end; }
       label { display:flex; flex-direction:column; font-size:14px; gap:4px; }
       input, button { font-size:14px; padding:6px 8px; }
+      .mode-group { display:flex; gap:6px; align-items:center; }
+      .mode-btn.active { background:#334155; color:#fff; border-color:#334155; }
       .canvas-wrap { border:1px solid #cbd5e1; width:max-content; max-width:100%; overflow:auto; background:#fff; }
       canvas { display:block; touch-action:none; }
       .error { color:#b91c1c; min-height:1.2em; }
@@ -27,13 +29,18 @@
         <label>가로 <input type="number" id="w" min="1" max="200" value="25" /></label>
         <label>세로 <input type="number" id="h" min="1" max="200" value="25" /></label>
         <button id="new">새 맵 생성</button>
+        <div class="mode-group">
+          <button id="brush" class="mode-btn" type="button">브러시 모드(1)</button>
+          <button id="eraser" class="mode-btn" type="button">지우개 모드(0)</button>
+        </div>
+        <button id="invert" type="button">JSON 0/1 반전</button>
         <label>JSON 불러오기 <input type="file" id="file" accept=".json,application/json,text/json" /></label>
         <button id="save">JSON 저장</button>
       </div>
 
       <div class="canvas-wrap"><canvas id="c"></canvas></div>
       <p id="err" class="error"></p>
-      <p class="help">클릭/드래그로 벽 토글. 아래 JSON은 FastAPI 커스텀 맵 입력에 그대로 붙여넣을 수 있습니다.</p>
+      <p class="help">브러시(1)/지우개(0) 모드를 선택해 클릭/드래그로 편집하세요. 아래 JSON은 FastAPI 커스텀 맵 입력에 그대로 붙여넣을 수 있습니다.</p>
       <textarea id="out" readonly></textarea>
     </main>
 
@@ -45,6 +52,9 @@
       const wInput = document.getElementById('w');
       const hInput = document.getElementById('h');
       const newBtn = document.getElementById('new');
+      const brushBtn = document.getElementById('brush');
+      const eraserBtn = document.getElementById('eraser');
+      const invertBtn = document.getElementById('invert');
       const fileInput = document.getElementById('file');
       const saveBtn = document.getElementById('save');
 
@@ -56,6 +66,11 @@
       function resetWalls(){ state.walls = Array.from({length:state.h}, ()=>Array.from({length:state.w}, ()=>0)); }
       function payload(){ return { n: state.w, k: state.h, walls: state.walls.flat() }; }
       function syncOutput(){ out.value = JSON.stringify(payload()); }
+      function setMode(mode){
+        state.mode = mode;
+        brushBtn.classList.toggle('active', mode===1);
+        eraserBtn.classList.toggle('active', mode===0);
+      }
 
       function drawGrid(){
         ctx.clearRect(0,0,c.width,c.height);
@@ -84,7 +99,6 @@
         const x = Math.floor((e.clientX-rect.left)/state.cell);
         const y = Math.floor((e.clientY-rect.top)/state.cell);
         if(x<0||y<0||x>=state.w||y>=state.h) return;
-        state.mode = state.walls[y][x]===1 ? 0 : 1;
         state.draw = true; state.seen.clear(); c.setPointerCapture(e.pointerId); applyAt(e);
       });
       c.addEventListener('pointermove', e=>{ if(state.draw) applyAt(e); });
@@ -94,6 +108,13 @@
       newBtn.addEventListener('click', ()=>{
         try{ state.w=parseIntStrict(wInput.value,'가로'); state.h=parseIntStrict(hInput.value,'세로'); resizeCanvas(); resetWalls(); drawGrid(); syncOutput(); showError(''); }
         catch(e){ showError(e.message); }
+      });
+
+      brushBtn.addEventListener('click', ()=>setMode(1));
+      eraserBtn.addEventListener('click', ()=>setMode(0));
+      invertBtn.addEventListener('click', ()=>{
+        state.walls = state.walls.map(row=>row.map(v=>v===1?0:1));
+        drawGrid(); syncOutput();
       });
 
       fileInput.addEventListener('change', async ()=>{
@@ -117,6 +138,7 @@
         const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='custom_map.json'; a.click(); URL.revokeObjectURL(a.href);
       });
 
+      setMode(1);
       resizeCanvas(); resetWalls(); drawGrid(); syncOutput();
     </script>
   </body>
