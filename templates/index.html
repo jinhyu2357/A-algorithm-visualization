@@ -107,6 +107,7 @@
                 <input type="file" id="custom-map-file" accept=".json,application/json,text/json" />
               </label>
               <button type="button" id="load-map-button">JSON 적용</button>
+              <button type="button" id="invert-map-button">0↔1 반전</button>
               <button type="button" id="download-map-button">JSON 저장</button>
             </div>
 
@@ -128,7 +129,10 @@
           <div class="canvas-wrap">
             <canvas id="map-editor-canvas" aria-label="커스텀 맵 편집 캔버스"></canvas>
           </div>
-          <small class="editor-help">클릭 또는 드래그로 벽(1)/빈칸(0)을 토글합니다.</small>
+          <small class="editor-help"
+            >클릭 또는 드래그로 벽(1)/빈칸(0)을 토글합니다. JSON에서 0과 1을 바꿔 저장한 뒤 다시 불러오면 편집을 이어서 할 수
+            있습니다.</small
+          >
         </section>
 
         <p class="hint">커스텀 맵이 입력되면 Grid Size/Wall Probability 대신 커스텀 맵이 우선 적용됩니다.</p>
@@ -151,6 +155,7 @@
         const customMapTextarea = document.getElementById("custom-map-textarea");
         const customMapFile = document.getElementById("custom-map-file");
         const loadMapButton = document.getElementById("load-map-button");
+        const invertMapButton = document.getElementById("invert-map-button");
         const downloadMapButton = document.getElementById("download-map-button");
         const newMapButton = document.getElementById("new-map-button");
         const editorWidthInput = document.getElementById("editor-width");
@@ -366,6 +371,16 @@
           showEditorError("");
         }
 
+        function invertAllWalls() {
+          for (let row = 0; row < state.height; row += 1) {
+            for (let col = 0; col < state.width; col += 1) {
+              state.walls[row][col] = state.walls[row][col] === 1 ? 0 : 1;
+            }
+          }
+          redrawCanvas();
+          syncTextarea();
+        }
+
         function parseTextareaMap() {
           const rawText = customMapTextarea.value.trim();
           if (!rawText) {
@@ -483,6 +498,17 @@
             } catch (error) {
               showEditorError(error.message);
             }
+          });
+        }
+
+        if (invertMapButton instanceof HTMLButtonElement) {
+          invertMapButton.addEventListener("click", () => {
+            if (state.width <= 0 || state.height <= 0) {
+              showEditorError("No map data to invert.");
+              return;
+            }
+            invertAllWalls();
+            showEditorError("");
           });
         }
 
