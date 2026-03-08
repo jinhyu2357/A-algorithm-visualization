@@ -6,7 +6,7 @@
     <title>A* Algorithm Web Visualizer</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
-  <body>
+  <body class="page-background">
     <main class="container">
       <h1>A* 알고리즘 시각화</h1>
       <p>파라미터를 조정하거나 커스텀 맵(JSON)을 편집해서 A* 탐색 과정을 확인하세요.</p>
@@ -148,6 +148,7 @@
         <h2>{% if view_mode == "animation" %}탐색 애니메이션{% else %}최종 결과{% endif %}</h2>
         <img src="{{ preview_url }}" alt="A* result preview" />
       </section>
+
     </main>
 
     <script>
@@ -331,10 +332,12 @@
         function drawCell(row, col) {
           const x = col * state.cellSize;
           const y = row * state.cellSize;
-          const fill = state.walls[row][col] === 1 ? "#111827" : "#ffffff";
+          ctx.clearRect(x, y, state.cellSize, state.cellSize);
 
-          ctx.fillStyle = fill;
-          ctx.fillRect(x, y, state.cellSize, state.cellSize);
+          if (state.walls[row][col] === 1) {
+            ctx.fillStyle = "#111827";
+            ctx.fillRect(x, y, state.cellSize, state.cellSize);
+          }
 
           ctx.strokeStyle = "#d1d5db";
           ctx.lineWidth = 1;

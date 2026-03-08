@@ -5,8 +5,17 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
   background: #f8fafc;
   color: #0f172a;
+}
+
+body.page-background {
+  background-color: #f8fafc;
+  background-image: linear-gradient(rgba(248, 250, 252, 0.82), rgba(248, 250, 252, 0.82)), url("/static/test.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .container {
@@ -152,6 +161,10 @@ input[type="range"] {
 
 #map-editor-canvas {
   display: block;
+  background-image: url("/static/test.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   touch-action: none;
   user-select: none;
   cursor: crosshair;

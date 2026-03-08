@@ -13,8 +13,15 @@
       input, button { font-size:14px; padding:6px 8px; }
       .mode-group { display:flex; gap:6px; align-items:center; }
       .mode-btn.active { background:#334155; color:#fff; border-color:#334155; }
-      .canvas-wrap { border:1px solid #cbd5e1; width:max-content; max-width:100%; overflow:auto; background:#fff; }
-      canvas { display:block; touch-action:none; }
+      .canvas-wrap { border:1px solid #cbd5e1; width:max-content; max-width:100%; overflow:auto; background:#e2e8f0; }
+      canvas {
+        display:block;
+        touch-action:none;
+        background-image:url('./test.png');
+        background-position:center;
+        background-repeat:no-repeat;
+        background-size:cover;
+      }
       .error { color:#b91c1c; min-height:1.2em; }
       .help { color:#475569; }
       textarea { width:100%; height:100px; margin-top:8px; font-family:monospace; }
@@ -75,10 +82,11 @@
       function drawGrid(){
         ctx.clearRect(0,0,c.width,c.height);
         for(let r=0;r<state.h;r++) for(let col=0;col<state.w;col++){
-          ctx.fillStyle = state.walls[r][col]===1 ? '#334155':'#ffffff';
+          if(state.walls[r][col]!==1) continue;
+          ctx.fillStyle = '#334155';
           ctx.fillRect(col*state.cell, r*state.cell, state.cell, state.cell);
         }
-        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.9)'; ctx.lineWidth = 1;
         for(let x=0;x<=state.w;x++){ ctx.beginPath(); ctx.moveTo(x*state.cell+0.5,0); ctx.lineTo(x*state.cell+0.5,c.height); ctx.stroke(); }
         for(let y=0;y<=state.h;y++){ ctx.beginPath(); ctx.moveTo(0,y*state.cell+0.5); ctx.lineTo(c.width,y*state.cell+0.5); ctx.stroke(); }
       }
