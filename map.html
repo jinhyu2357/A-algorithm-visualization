@@ -54,6 +54,9 @@
         background:#334155;
         border-color:#334155;
       }
+      .toggle-btn {
+        margin-left:auto;
+      }
       .canvas-wrap {
         width:100%;
         min-height:320px;
@@ -110,9 +113,10 @@
         <button id="invert" type="button">invert 0/1</button>
         <label>JSON import <input type="file" id="file" accept=".json,application/json,text/json" /></label>
         <button id="save" type="button">save</button>
+        <button id="toggle-grid" class="toggle-btn" type="button" aria-controls="grid-panel" aria-expanded="true">hide grid</button>
       </div>
 
-      <div class="canvas-wrap"><div class="canvas-stage"><canvas id="c"></canvas></div></div>
+      <div id="grid-panel"><div class="canvas-wrap"><div class="canvas-stage"><canvas id="c"></canvas></div></div></div>
       <p id="err" class="error"></p>
       <p class="help">The grid has no inner horizontal slider. Use Shift + Wheel to move horizontally across the page.</p>
       <textarea id="out" readonly></textarea>
@@ -133,6 +137,8 @@
       const invertBtn = document.getElementById('invert');
       const fileInput = document.getElementById('file');
       const saveBtn = document.getElementById('save');
+      const toggleGridBtn = document.getElementById('toggle-grid');
+      const gridPanel = document.getElementById('grid-panel');
 
       const INITIAL_VIEW_SCALE = 2;
       const MAX_INITIAL_CELL = 64;
@@ -210,6 +216,15 @@
           ctx.moveTo(0, y * state.cell + 0.5);
           ctx.lineTo(c.width, y * state.cell + 0.5);
           ctx.stroke();
+        }
+      }
+      function setGridExpanded(expanded){
+        gridPanel.hidden = !expanded;
+        toggleGridBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        toggleGridBtn.textContent = expanded ? 'hide grid' : 'show grid';
+        if(expanded){
+          resizeCanvas({ center:true });
+          drawGrid();
         }
       }
       function eventToCell(e){
@@ -324,6 +339,11 @@
         URL.revokeObjectURL(a.href);
       });
 
+      toggleGridBtn.addEventListener('click', () => {
+        const expanded = toggleGridBtn.getAttribute('aria-expanded') !== 'true';
+        setGridExpanded(expanded);
+      });
+
       window.addEventListener('resize', () => {
         resizeCanvas();
         drawGrid();
@@ -334,6 +354,7 @@
       resetWalls();
       drawGrid();
       syncOutput();
+      setGridExpanded(true);
     </script>
   </body>
 </html>

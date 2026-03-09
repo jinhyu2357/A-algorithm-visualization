@@ -97,7 +97,18 @@
         </label>
 
         <section class="map-editor" aria-labelledby="map-editor-title">
-          <h3 id="map-editor-title">마우스 맵 에디터</h3>
+          <div class="map-editor-header">
+            <h3 id="map-editor-title">마우스 맵 에디터</h3>
+            <button
+              type="button"
+              id="toggle-map-editor-button"
+              class="map-editor-toggle"
+              aria-controls="map-editor-body"
+              aria-expanded="false"
+            >
+              맵 에디터 펼치기
+            </button>
+          </div>
 
           <div class="map-editor-toolbar">
             <div class="toolbar-row">
@@ -125,13 +136,15 @@
             <p id="map-editor-error" class="editor-error" hidden></p>
           </div>
 
-          <div class="canvas-wrap">
-            <canvas id="map-editor-canvas" aria-label="커스텀 맵 편집 캔버스"></canvas>
+          <div id="map-editor-body" class="map-editor-body" hidden>
+            <div class="canvas-wrap">
+              <canvas id="map-editor-canvas" aria-label="커스텀 맵 편집 캔버스"></canvas>
+            </div>
+            <small class="editor-help"
+              >클릭 또는 드래그로 벽(1)/빈칸(0)을 토글합니다. JSON에서 0과 1을 바꿔 저장한 뒤 다시 불러오면 편집을 이어서 할 수
+              있습니다.</small
+            >
           </div>
-          <small class="editor-help"
-            >클릭 또는 드래그로 벽(1)/빈칸(0)을 토글합니다. JSON에서 0과 1을 바꿔 저장한 뒤 다시 불러오면 편집을 이어서 할 수
-            있습니다.</small
-          >
         </section>
 
         <p class="hint">커스텀 맵이 입력되면 Grid Size/Wall Probability 대신 커스텀 맵이 우선 적용됩니다.</p>
@@ -165,6 +178,8 @@
         const editorWidthInput = document.getElementById("editor-width");
         const editorHeightInput = document.getElementById("editor-height");
         const editorError = document.getElementById("map-editor-error");
+        const toggleMapEditorButton = document.getElementById("toggle-map-editor-button");
+        const mapEditorBody = document.getElementById("map-editor-body");
         const canvas = document.getElementById("map-editor-canvas");
         const form = document.getElementById("main-form");
         const sizeInput = document.querySelector('input[name="size"]');
@@ -398,6 +413,23 @@
             for (let col = 0; col < state.width; col += 1) {
               drawCell(row, col);
             }
+          }
+        }
+
+        function setMapEditorExpanded(expanded) {
+          if (!(toggleMapEditorButton instanceof HTMLButtonElement) || !(mapEditorBody instanceof HTMLElement)) {
+            return;
+          }
+          mapEditorBody.hidden = !expanded;
+          toggleMapEditorButton.setAttribute("aria-expanded", expanded ? "true" : "false");
+          /*
+          toggleMapEditorButton.textContent = expanded ? "맵 에디터 접기" : "맵 에디터 펼치기";
+          */
+          toggleMapEditorButton.textContent = expanded
+            ? "\uB9F5 \uC5D0\uB514\uD130 \uC811\uAE30"
+            : "\uB9F5 \uC5D0\uB514\uD130 \uD3BC\uCE58\uAE30";
+          if (expanded && state.width > 0 && state.height > 0) {
+            redrawCanvas();
           }
         }
 
@@ -636,6 +668,13 @@
           });
         }
 
+        if (toggleMapEditorButton instanceof HTMLButtonElement) {
+          toggleMapEditorButton.addEventListener("click", () => {
+            const expanded = toggleMapEditorButton.getAttribute("aria-expanded") !== "true";
+            setMapEditorExpanded(expanded);
+          });
+        }
+
         if (form instanceof HTMLFormElement) {
           form.addEventListener("submit", (event) => {
             try {
@@ -678,6 +717,8 @@
         if (!initialized) {
           applyMap(emptyMap(defaultSize, defaultSize), false);
         }
+
+        setMapEditorExpanded(false);
       })();
     </script>
   </body>
