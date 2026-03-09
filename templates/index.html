@@ -6,7 +6,6 @@
     <title>A* Algorithm Web Visualizer</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
-  <body class="page-background">
     <main class="container">
       <h1>A* 알고리즘 시각화</h1>
       <p>파라미터를 조정하거나 커스텀 맵(JSON)을 편집해서 A* 탐색 과정을 확인하세요.</p>
@@ -114,11 +113,11 @@
             <div class="toolbar-row">
               <label class="inline-field">
                 가로
-                <input type="number" id="editor-width" min="1" max="200" step="1" />
+                <input type="number" id="editor-width" min="1" max="2000" step="1" />
               </label>
               <label class="inline-field">
                 세로
-                <input type="number" id="editor-height" min="1" max="200" step="1" />
+                <input type="number" id="editor-height" min="1" max="2000" step="1" />
               </label>
               <button type="button" id="new-map-button">새 맵 생성</button>
             </div>
@@ -136,6 +135,10 @@
         </section>
 
         <p class="hint">커스텀 맵이 입력되면 Grid Size/Wall Probability 대신 커스텀 맵이 우선 적용됩니다.</p>
+
+        {% if notice_message %}
+          <p class="notice-message">{{ notice_message }}</p>
+        {% endif %}
 
         {% if error_message %}
           <p class="error-message">{{ error_message }}</p>
@@ -163,7 +166,12 @@
         const editorHeightInput = document.getElementById("editor-height");
         const editorError = document.getElementById("map-editor-error");
         const canvas = document.getElementById("map-editor-canvas");
+        const form = document.getElementById("main-form");
         const sizeInput = document.querySelector('input[name="size"]');
+        const startRowInput = document.querySelector('input[name="start_row"]');
+        const startColInput = document.querySelector('input[name="start_col"]');
+        const goalRowInput = document.querySelector('input[name="goal_row"]');
+        const goalColInput = document.querySelector('input[name="goal_col"]');
 
         if (!(customMapTextarea instanceof HTMLTextAreaElement) || !(canvas instanceof HTMLCanvasElement)) {
           return;
@@ -188,6 +196,7 @@
 
         const MAX_CANVAS_PX = 720;
         const MIN_CELL_SIZE = 6;
+        const CUSTOM_MAP_MAX_DIM = 2000;
 
         function showEditorError(message) {
           if (!(editorError instanceof HTMLElement)) {
@@ -202,13 +211,16 @@
           editorError.textContent = message;
         }
 
-        function parsePositiveInt(raw, fieldName) {
+        function parsePositiveInt(raw, fieldName, maxValue = CUSTOM_MAP_MAX_DIM) {
           if (typeof raw === "string" && raw.trim() === "") {
             throw new Error(fieldName + " value is empty.");
           }
           const value = Number(raw);
           if (!Number.isInteger(value) || value <= 0) {
             throw new Error(fieldName + " must be an integer greater than 0.");
+          }
+          if (value > maxValue) {
+            throw new Error(fieldName + " must be " + maxValue + " or less.");
           }
           return value;
         }
@@ -219,6 +231,41 @@
             throw new Error("walls values must be 0 or 1.");
           }
           return value;
+        }
+
+        function parseOptionalCoordinateInput(input, fieldName) {
+          if (!(input instanceof HTMLInputElement)) {
+            return null;
+          }
+          const raw = input.value.trim();
+          if (!raw) {
+            return null;
+          }
+          const value = Number(raw);
+          if (!Number.isInteger(value) || value < 0) {
+            throw new Error(fieldName + " must be an integer greater than or equal to 0.");
+          }
+          return value;
+        }
+
+        function readStartGoalInputs() {
+          const startRow = parseOptionalCoordinateInput(startRowInput, "start_row");
+          const startCol = parseOptionalCoordinateInput(startColInput, "start_col");
+          const goalRow = parseOptionalCoordinateInput(goalRowInput, "goal_row");
+          const goalCol = parseOptionalCoordinateInput(goalColInput, "goal_col");
+          const coordinates = [startRow, startCol, goalRow, goalCol];
+
+          if (coordinates.some((value) => value === null)) {
+            return null;
+          }
+          if (startRow === goalRow && startCol === goalCol) {
+            throw new Error("Start and goal positions must be different.");
+          }
+
+          return {
+            start: { row: startRow, col: startCol },
+            goal: { row: goalRow, col: goalCol },
+          };
         }
 
         function normalizeMapPayload(payload) {
@@ -398,6 +445,32 @@
           return normalizeMapPayload(payload);
         }
 
+        function ensureStartGoalCellsAreFree(startGoal) {
+          if (!startGoal) {
+            return;
+          }
+
+          let changed = false;
+          for (const [label, position] of [
+            ["Start", startGoal.start],
+            ["Goal", startGoal.goal],
+          ]) {
+            const { row, col } = position;
+            if (row >= state.height || col >= state.width) {
+              throw new Error(label + " position (" + row + ", " + col + ") is out of bounds for the current map.");
+            }
+            if (state.walls[row][col] !== 0) {
+              state.walls[row][col] = 0;
+              changed = true;
+            }
+          }
+
+          if (changed) {
+            redrawCanvas();
+            syncTextarea();
+          }
+        }
+
         function eventToCell(event) {
           const rect = canvas.getBoundingClientRect();
           if (rect.width <= 0 || rect.height <= 0) {
@@ -558,6 +631,26 @@
               const height = parsePositiveInt(editorHeightInput.value, "height");
               applyMap(emptyMap(width, height), true);
             } catch (error) {
+              showEditorError(error.message);
+            }
+          });
+        }
+
+        if (form instanceof HTMLFormElement) {
+          form.addEventListener("submit", (event) => {
+            try {
+              const startGoal = readStartGoalInputs();
+              if (!customMapTextarea.value.trim()) {
+                showEditorError("");
+                return;
+              }
+
+              const map = parseTextareaMap();
+              applyMap(map, true);
+              ensureStartGoalCellsAreFree(startGoal);
+              showEditorError("");
+            } catch (error) {
+              event.preventDefault();
               showEditorError(error.message);
             }
           });

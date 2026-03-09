@@ -194,6 +194,16 @@ input[type="range"] {
   color: #475569;
 }
 
+.notice-message {
+  margin: 0;
+  color: #075985;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-weight: 600;
+}
+
 .error-message {
   margin: 0;
   color: #b91c1c;
@@ -225,9 +235,10 @@ button {
 
 .preview img {
   width: 100%;
-  max-width: 640px;
+  max-width: 100%;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
+  image-rendering: pixelated;
 }
 
 @media (max-width: 640px) {

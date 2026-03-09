@@ -59,10 +59,14 @@ class MazeAStarVisualizer:
                 raise ValueError("`width` does not match custom wall grid width.")
             if height is not None and int(height) != self.height:
                 raise ValueError("`height` does not match custom wall grid height.")
-            self.base_maze = normalized_grid
             if start is not None and goal is not None:
-                self.start, self.goal = self._validate_manual_start_goal(start=start, goal=goal, maze=self.base_maze)
+                self.start, self.goal, self.base_maze = self._prepare_manual_start_goal_for_fixed_maze(
+                    start=start,
+                    goal=goal,
+                    maze=normalized_grid,
+                )
             else:
+                self.base_maze = normalized_grid
                 self.start, self.goal = self._pick_start_goal_for_fixed_maze(self.base_maze, min_distance=10)
         else:
             self.width = int(width) if width is not None else int(size)
@@ -72,7 +76,7 @@ class MazeAStarVisualizer:
             if start is not None and goal is not None:
                 self.start, self.goal = self._validate_manual_start_goal(start=start, goal=goal, maze=None)
             else:
-                self.start, self.goal = self._pick_start_goal(min_distance=10)
+                self.start, self.goal = self._pick_start_goal(min_distance=100)
             self.base_maze = self._create_solvable_maze()
 
         self.goal_direction = self._direction_vector(self.start, self.goal)
@@ -133,6 +137,22 @@ class MazeAStarVisualizer:
                 raise ValueError("No path exists between the provided start and goal positions.")
 
         return normalized_start, normalized_goal
+
+    def _prepare_manual_start_goal_for_fixed_maze(
+        self,
+        start: GridPos,
+        goal: GridPos,
+        maze: np.ndarray,
+    ) -> Tuple[GridPos, GridPos, np.ndarray]:
+        normalized_start, normalized_goal = self._validate_manual_start_goal(start=start, goal=goal, maze=None)
+        adjusted_maze = maze.copy()
+        adjusted_maze[normalized_start] = self.FREE
+        adjusted_maze[normalized_goal] = self.FREE
+
+        if not self._has_path(adjusted_maze, normalized_start, normalized_goal):
+            raise ValueError("No path exists between the provided start and goal positions.")
+
+        return normalized_start, normalized_goal, adjusted_maze
 
     def _pick_start_goal(self, min_distance: int) -> Tuple[GridPos, GridPos]:
         candidates = [(row, col) for row in range(1, self.height - 1) for col in range(1, self.width - 1)]
@@ -303,6 +323,55 @@ class MazeAStarVisualizer:
                     open_set.add(neighbor)
 
             yield self._mark_start_goal(grid.copy())
+
+    def solve_final_grid(self) -> np.ndarray:
+        """Run A* to completion and return only the final rendered grid."""
+        grid = self.base_maze.copy()
+        grid[self.start] = self.START
+        grid[self.goal] = self.GOAL
+
+        start_h = self.heuristic(self.start, self.goal)
+        open_heap: List[PrioritizedNode] = [PrioritizedNode((start_h, 0.0, start_h), self.start)]
+        g_score = {self.start: 0}
+        came_from: dict[GridPos, GridPos] = {}
+        open_set = {self.start}
+        closed_set = set()
+
+        while open_heap:
+            current = heapq.heappop(open_heap).position
+            if current not in open_set:
+                continue
+
+            open_set.remove(current)
+
+            if current != self.start:
+                closed_set.add(current)
+                grid[current] = self.CLOSED
+
+            if current == self.goal:
+                for step in self._reconstruct_path(came_from, current):
+                    if step not in (self.start, self.goal):
+                        grid[step] = self.PATH
+                return self._mark_start_goal(grid)
+
+            for neighbor in self._ordered_neighbors(current):
+                if self.base_maze[neighbor] == self.WALL or neighbor in closed_set:
+                    continue
+
+                tentative_g = g_score[current] + 1
+                if tentative_g < g_score.get(neighbor, float("inf")):
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g
+                    h_score = self.heuristic(neighbor, self.goal)
+                    f_score = tentative_g + h_score
+                    direction_penalty = self._direction_penalty(current, neighbor)
+                    heapq.heappush(open_heap, PrioritizedNode((f_score, direction_penalty, h_score), neighbor))
+
+                    if neighbor not in (self.start, self.goal):
+                        grid[neighbor] = self.OPEN
+                    open_set.add(neighbor)
+
+        return self._mark_start_goal(grid)
 
     def _mark_start_goal(self, grid: np.ndarray) -> np.ndarray:
         grid[self.start] = self.START
