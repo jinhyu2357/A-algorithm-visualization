@@ -77,6 +77,9 @@
         display:block;
         cursor:crosshair;
         touch-action:auto;
+        -webkit-user-select:none;
+        user-select:none;
+        -webkit-touch-callout:none;
         background-image:url('./test.png');
         background-position:center;
         background-repeat:no-repeat;
@@ -318,6 +321,9 @@
           updateTouchInteractionMode();
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
+      });
+      c.addEventListener('contextmenu', e => {
+        e.preventDefault();
       });
       canvasWrap.addEventListener('wheel', e => {
         e.preventDefault();
