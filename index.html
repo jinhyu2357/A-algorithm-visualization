@@ -244,8 +244,8 @@
         state.seen.clear();
       }
       function updateTouchInteractionMode(){
-        c.style.touchAction = 'auto';
-        if(state.touchPointers.size >= 1){
+        c.style.touchAction = state.touchPointers.size === 1 ? 'none' : 'auto';
+        if(state.touchPointers.size >= 2){
           stopDrawing();
           for(const pointerId of state.touchPointers){
             if(c.hasPointerCapture(pointerId)) c.releasePointerCapture(pointerId);
@@ -278,6 +278,13 @@
           state.touchPointers.add(e.pointerId);
           state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
           updateTouchInteractionMode();
+          if(state.touchPointers.size !== 1) return;
+          if(!eventToCell(e)) return;
+          state.draw = true;
+          state.activePointerId = e.pointerId;
+          state.seen.clear();
+          if(!c.hasPointerCapture(e.pointerId)) c.setPointerCapture(e.pointerId);
+          applyAt(e);
           return;
         }
         if(!eventToCell(e)) return;
@@ -292,7 +299,7 @@
           if(!state.touchPointers.has(e.pointerId)) return;
           state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
           updateTouchInteractionMode();
-          if(state.touchPointers.size !== 1) return;
+          if(state.touchPointers.size !== 1 || state.activePointerId !== e.pointerId) return;
         }
         if(state.draw && state.activePointerId === e.pointerId) applyAt(e);
       });
