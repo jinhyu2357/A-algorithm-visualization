@@ -264,7 +264,6 @@
       }
       function updateTouchInteractionMode(){
         const touchCount = state.touchPointers.size;
-        c.style.touchAction = touchCount === 1 ? 'none' : 'auto';
         if(touchCount >= 2){
           stopDrawing();
           for(const pointerId of state.touchPointers){
@@ -328,6 +327,7 @@
           state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
           updateTouchInteractionMode();
           if(!isSingleTouchDrawEvent(e)) return;
+          if(state.draw) e.preventDefault();
         }
         if(state.draw && isSingleTouchDrawEvent(e)) applyAt(e);
       });
