@@ -157,6 +157,7 @@
         touchPointers: new Set(),
         touchPositions: new Map(),
         multiTouchPanCenter: null,
+        isMultiTouchPassthrough: false,
       };
 
       function showError(msg=''){ err.textContent = msg; }
@@ -269,8 +270,16 @@
           for(const pointerId of state.touchPointers){
             if(c.hasPointerCapture(pointerId)) c.releasePointerCapture(pointerId);
           }
+          if(!state.isMultiTouchPassthrough){
+            c.style.pointerEvents = 'none';
+            state.isMultiTouchPassthrough = true;
+          }
           state.multiTouchPanCenter = getMultiTouchCenter();
           return;
+        }
+        if(state.isMultiTouchPassthrough){
+          c.style.pointerEvents = 'auto';
+          state.isMultiTouchPassthrough = false;
         }
         state.multiTouchPanCenter = null;
       }
