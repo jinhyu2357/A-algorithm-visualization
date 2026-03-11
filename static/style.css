@@ -175,7 +175,8 @@ input[type="range"] {
 }
 
 .canvas-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #fff;
@@ -187,7 +188,7 @@ input[type="range"] {
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  touch-action: auto;
+  touch-action: pan-y pinch-zoom;
   user-select: none;
   cursor: crosshair;
 }
