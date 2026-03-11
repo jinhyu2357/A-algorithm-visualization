@@ -142,8 +142,6 @@
 
       const INITIAL_VIEW_SCALE = 2;
       const MAX_INITIAL_CELL = 64;
-      const MIN_CELL_SIZE = 6;
-      const MAX_CELL_SIZE = 64;
       const state = {
         w: 500,
         h: 500,
@@ -153,9 +151,7 @@
         mode:1,
         seen:new Set(),
         activePointerId: null,
-        touches: new Map(),
-        pinchStartDistance: 0,
-        pinchStartCell: 16,
+        touchPointers: new Set(),
       };
 
       function showError(msg=''){ err.textContent = msg; }
@@ -241,32 +237,6 @@
           drawGrid();
         }
       }
-      function clamp(v, min, max){
-        return Math.min(max, Math.max(min, v));
-      }
-      function pointerPos(e){
-        return { x: e.clientX, y: e.clientY };
-      }
-      function touchDistance(){
-        const points = [...state.touches.values()];
-        if(points.length < 2) return 0;
-        const [a, b] = points;
-        return Math.hypot(a.x - b.x, a.y - b.y);
-      }
-      function applyPinchZoom(){
-        const distance = touchDistance();
-        if(distance <= 0 || state.pinchStartDistance <= 0) return;
-        const nextCell = clamp(
-          Math.round(state.pinchStartCell * (distance / state.pinchStartDistance)),
-          MIN_CELL_SIZE,
-          MAX_CELL_SIZE,
-        );
-        if(nextCell === state.cell) return;
-        c.width = Math.max(1, Math.floor(state.w * nextCell));
-        c.height = Math.max(1, Math.floor(state.h * nextCell));
-        state.cell = nextCell;
-        drawGrid();
-      }
       function stopDrawing(){
         state.draw = false;
         state.activePointerId = null;
@@ -295,18 +265,15 @@
       c.addEventListener('pointerdown', e => {
         showError('');
         if(e.pointerType === 'touch'){
-          state.touches.set(e.pointerId, pointerPos(e));
+          state.touchPointers.add(e.pointerId);
           c.setPointerCapture(e.pointerId);
 
-          if(state.touches.size >= 2){
+          if(state.touchPointers.size !== 1){
             stopDrawing();
-            state.pinchStartDistance = touchDistance();
-            state.pinchStartCell = state.cell;
             return;
           }
         }
         if(!eventToCell(e)) return;
-        if(e.pointerType === 'touch' && state.touches.size !== 1) return;
         state.draw = true;
         state.activePointerId = e.pointerId;
         state.seen.clear();
@@ -314,30 +281,21 @@
         applyAt(e);
       });
       c.addEventListener('pointermove', e => {
-        if(e.pointerType === 'touch' && state.touches.has(e.pointerId)){
-          state.touches.set(e.pointerId, pointerPos(e));
-          if(state.touches.size >= 2){
-            applyPinchZoom();
-            return;
-          }
+        if(e.pointerType === 'touch'){
+          if(!state.touchPointers.has(e.pointerId)) return;
+          if(state.touchPointers.size !== 1) return;
         }
         if(state.draw && state.activePointerId === e.pointerId) applyAt(e);
       });
       c.addEventListener('pointerup', e => {
         if(e.pointerType === 'touch'){
-          state.touches.delete(e.pointerId);
-          if(state.touches.size < 2){
-            state.pinchStartDistance = 0;
-          }
+          state.touchPointers.delete(e.pointerId);
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
       });
       c.addEventListener('pointercancel', e => {
         if(e.pointerType === 'touch'){
-          state.touches.delete(e.pointerId);
-          if(state.touches.size < 2){
-            state.pinchStartDistance = 0;
-          }
+          state.touchPointers.delete(e.pointerId);
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
       });
