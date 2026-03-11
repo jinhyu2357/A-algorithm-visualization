@@ -563,6 +563,9 @@
           if (event.button !== 0) {
             return;
           }
+          if (event.pointerType === "touch") {
+            return;
+          }
           const cell = eventToCell(event);
           if (!cell) {
             return;
@@ -572,7 +575,6 @@
           state.dragVisited.clear();
           canvas.setPointerCapture(event.pointerId);
           toggleCell(cell.row, cell.col);
-          event.preventDefault();
         });
 
         canvas.addEventListener("pointermove", (event) => {
