@@ -76,7 +76,7 @@
       canvas {
         display:block;
         cursor:crosshair;
-        touch-action:none;
+        touch-action:auto;
         background-image:url('./test.png');
         background-position:center;
         background-repeat:no-repeat;
@@ -244,15 +244,13 @@
         state.seen.clear();
       }
       function updateTouchInteractionMode(){
-        if(state.touchPointers.size >= 2){
+        c.style.touchAction = 'auto';
+        if(state.touchPointers.size >= 1){
           stopDrawing();
-          c.style.touchAction = 'auto';
           for(const pointerId of state.touchPointers){
             if(c.hasPointerCapture(pointerId)) c.releasePointerCapture(pointerId);
           }
-          return;
         }
-        c.style.touchAction = 'none';
       }
       function eventToCell(e){
         const rect = c.getBoundingClientRect();
@@ -280,11 +278,7 @@
           state.touchPointers.add(e.pointerId);
           state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
           updateTouchInteractionMode();
-
-          if(state.touchPointers.size !== 1){
-            stopDrawing();
-            return;
-          }
+          return;
         }
         if(!eventToCell(e)) return;
         state.draw = true;
