@@ -306,21 +306,21 @@
         }
         if(state.draw && state.activePointerId === e.pointerId) applyAt(e);
       });
-      c.addEventListener('pointerup', e => {
+      function handlePointerEnd(e){
         if(e.pointerType === 'touch'){
           state.touchPointers.delete(e.pointerId);
           state.touchPositions.delete(e.pointerId);
           updateTouchInteractionMode();
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
-      });
-      c.addEventListener('pointercancel', e => {
-        if(e.pointerType === 'touch'){
-          state.touchPointers.delete(e.pointerId);
-          state.touchPositions.delete(e.pointerId);
-          updateTouchInteractionMode();
-        }
-        if(state.activePointerId === e.pointerId) stopDrawing();
+      }
+
+      c.addEventListener('pointerup', handlePointerEnd);
+      c.addEventListener('pointercancel', handlePointerEnd);
+      window.addEventListener('pointerup', handlePointerEnd);
+      window.addEventListener('pointercancel', handlePointerEnd);
+      c.addEventListener('contextmenu', e => {
+        e.preventDefault();
       });
       c.addEventListener('contextmenu', e => {
         e.preventDefault();
