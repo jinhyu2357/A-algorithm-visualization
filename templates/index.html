@@ -207,6 +207,7 @@
           dragVisited: new Set(),
           syncTimerId: null,
           needsSync: false,
+          lastDrawnCell: null,
         };
 
         const MAX_CANVAS_PX = 720;
@@ -541,6 +542,28 @@
           scheduleTextareaSync();
         }
 
+        function togglePath(fromCell, toCell) {
+          if (!fromCell) {
+            toggleCell(toCell.row, toCell.col);
+            return;
+          }
+
+          const rowDistance = toCell.row - fromCell.row;
+          const colDistance = toCell.col - fromCell.col;
+          const steps = Math.max(Math.abs(rowDistance), Math.abs(colDistance));
+
+          if (steps === 0) {
+            toggleCell(toCell.row, toCell.col);
+            return;
+          }
+
+          for (let step = 1; step <= steps; step += 1) {
+            const row = Math.round(fromCell.row + (rowDistance * step) / steps);
+            const col = Math.round(fromCell.col + (colDistance * step) / steps);
+            toggleCell(row, col);
+          }
+        }
+
         function stopDrawing(pointerId) {
           if (!state.isDrawing) {
             return;
@@ -554,6 +577,7 @@
           state.isDrawing = false;
           state.activePointerId = null;
           state.dragVisited.clear();
+          state.lastDrawnCell = null;
           if (state.needsSync) {
             syncTextarea();
           }
@@ -573,8 +597,10 @@
           state.isDrawing = true;
           state.activePointerId = event.pointerId;
           state.dragVisited.clear();
+          state.lastDrawnCell = null;
           canvas.setPointerCapture(event.pointerId);
-          toggleCell(cell.row, cell.col);
+          togglePath(state.lastDrawnCell, cell);
+          state.lastDrawnCell = cell;
         });
 
         canvas.addEventListener("pointermove", (event) => {
@@ -585,7 +611,8 @@
           if (!cell) {
             return;
           }
-          toggleCell(cell.row, cell.col);
+          togglePath(state.lastDrawnCell, cell);
+          state.lastDrawnCell = cell;
         });
 
         canvas.addEventListener("pointerup", (event) => {
