@@ -327,6 +327,12 @@
       c.addEventListener('contextmenu', e => {
         e.preventDefault();
       });
+      c.addEventListener('touchstart', e => {
+        if(e.touches.length === 1) e.preventDefault();
+      }, { passive:false });
+      c.addEventListener('touchmove', e => {
+        if(e.touches.length === 1) e.preventDefault();
+      }, { passive:false });
       canvasWrap.addEventListener('wheel', e => {
         e.preventDefault();
         const pageScroller = document.scrollingElement || document.documentElement;
