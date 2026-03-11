@@ -327,11 +327,10 @@
       c.addEventListener('contextmenu', e => {
         e.preventDefault();
       });
-      c.addEventListener('touchstart', e => {
-        if(e.touches.length === 1) e.preventDefault();
-      }, { passive:false });
       c.addEventListener('touchmove', e => {
-        if(e.touches.length === 1) e.preventDefault();
+        if(e.touches.length !== 1) return;
+        if(!state.draw) return;
+        e.preventDefault();
       }, { passive:false });
       canvasWrap.addEventListener('wheel', e => {
         e.preventDefault();
