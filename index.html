@@ -158,6 +158,7 @@
         touchPositions: new Map(),
         multiTouchPanCenter: null,
         isMultiTouchPassthrough: false,
+        lastCell: null,
       };
 
       function showError(msg=''){ err.textContent = msg; }
@@ -247,6 +248,7 @@
         state.draw = false;
         state.activePointerId = null;
         state.seen.clear();
+        state.lastCell = null;
       }
       function getMultiTouchCenter(){
         if(state.touchPointers.size < 2) return null;
@@ -294,18 +296,43 @@
         if(e.pointerType !== 'touch') return true;
         return state.touchPointers.size === 1 && state.activePointerId === e.pointerId;
       }
+      function applyCell(cell){
+        const key = `${cell.x},${cell.y}`;
+        if(state.seen.has(key)) return false;
+
+        state.seen.add(key);
+        state.walls[cell.y][cell.x] = state.mode;
+        return true;
+      }
       function applyAt(e){
         if(!isSingleTouchDrawEvent(e)) return;
         const cell = eventToCell(e);
         if(!cell) return;
 
-        const key = `${cell.x},${cell.y}`;
-        if(state.seen.has(key)) return;
+        let changed = false;
+        if(!state.lastCell){
+          changed = applyCell(cell) || changed;
+          state.lastCell = cell;
+        }else{
+          const dx = cell.x - state.lastCell.x;
+          const dy = cell.y - state.lastCell.y;
+          const steps = Math.max(Math.abs(dx), Math.abs(dy));
+          if(steps === 0){
+            changed = applyCell(cell) || changed;
+          }else{
+            for(let step = 1; step <= steps; step += 1){
+              const x = Math.round(state.lastCell.x + (dx * step) / steps);
+              const y = Math.round(state.lastCell.y + (dy * step) / steps);
+              changed = applyCell({ x, y }) || changed;
+            }
+          }
+          state.lastCell = cell;
+        }
 
-        state.seen.add(key);
-        state.walls[cell.y][cell.x] = state.mode;
-        drawGrid();
-        syncOutput();
+        if(changed){
+          drawGrid();
+          syncOutput();
+        }
       }
 
       c.addEventListener('pointerdown', e => {
@@ -319,6 +346,7 @@
           state.draw = true;
           state.activePointerId = e.pointerId;
           state.seen.clear();
+          state.lastCell = null;
           if(!c.hasPointerCapture(e.pointerId)) c.setPointerCapture(e.pointerId);
           applyAt(e);
           return;
@@ -327,6 +355,7 @@
         state.draw = true;
         state.activePointerId = e.pointerId;
         state.seen.clear();
+        state.lastCell = null;
         if(!c.hasPointerCapture(e.pointerId)) c.setPointerCapture(e.pointerId);
         applyAt(e);
       });
