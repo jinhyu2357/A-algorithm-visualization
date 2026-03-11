@@ -156,6 +156,7 @@
         activePointerId: null,
         touchPointers: new Set(),
         touchPositions: new Map(),
+        multiTouchPanCenter: null,
       };
 
       function showError(msg=''){ err.textContent = msg; }
@@ -246,6 +247,21 @@
         state.activePointerId = null;
         state.seen.clear();
       }
+      function getMultiTouchCenter(){
+        if(state.touchPointers.size < 2) return null;
+        const positions = [];
+        for(const pointerId of state.touchPointers){
+          const pos = state.touchPositions.get(pointerId);
+          if(!pos) continue;
+          positions.push(pos);
+          if(positions.length === 2) break;
+        }
+        if(positions.length < 2) return null;
+        return {
+          x: (positions[0].x + positions[1].x) / 2,
+          y: (positions[0].y + positions[1].y) / 2,
+        };
+      }
       function updateTouchInteractionMode(){
         const touchCount = state.touchPointers.size;
         if(touchCount >= 2){
@@ -253,7 +269,10 @@
           for(const pointerId of state.touchPointers){
             if(c.hasPointerCapture(pointerId)) c.releasePointerCapture(pointerId);
           }
+          state.multiTouchPanCenter = getMultiTouchCenter();
+          return;
         }
+        state.multiTouchPanCenter = null;
       }
       function eventToCell(e){
         const rect = c.getBoundingClientRect();
