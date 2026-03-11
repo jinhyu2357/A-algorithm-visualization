@@ -152,6 +152,9 @@
         seen:new Set(),
         activePointerId: null,
         touchPointers: new Set(),
+        touchPositions: new Map(),
+        touchPanActive: false,
+        lastTouchMidpoint: null,
       };
 
       function showError(msg=''){ err.textContent = msg; }
@@ -242,6 +245,29 @@
         state.activePointerId = null;
         state.seen.clear();
       }
+      function midpointFromTouches(){
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        for(const pointerId of state.touchPointers){
+          const pos = state.touchPositions.get(pointerId);
+          if(!pos) continue;
+          sumX += pos.x;
+          sumY += pos.y;
+          count += 1;
+        }
+        if(count < 2) return null;
+        return { x: sumX / count, y: sumY / count };
+      }
+      function updateTouchPanState(){
+        if(state.touchPointers.size === 2){
+          state.touchPanActive = true;
+          state.lastTouchMidpoint = midpointFromTouches();
+          return;
+        }
+        state.touchPanActive = false;
+        state.lastTouchMidpoint = null;
+      }
       function eventToCell(e){
         const rect = c.getBoundingClientRect();
         const x = Math.floor((e.clientX - rect.left) / state.cell);
@@ -266,7 +292,9 @@
         showError('');
         if(e.pointerType === 'touch'){
           state.touchPointers.add(e.pointerId);
+          state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
           c.setPointerCapture(e.pointerId);
+          updateTouchPanState();
 
           if(state.touchPointers.size !== 1){
             stopDrawing();
@@ -283,6 +311,19 @@
       c.addEventListener('pointermove', e => {
         if(e.pointerType === 'touch'){
           if(!state.touchPointers.has(e.pointerId)) return;
+          state.touchPositions.set(e.pointerId, { x:e.clientX, y:e.clientY });
+          if(state.touchPanActive && state.touchPointers.size >= 2){
+            const nextMidpoint = midpointFromTouches();
+            const prevMidpoint = state.lastTouchMidpoint;
+            if(nextMidpoint && prevMidpoint){
+              const pageScroller = document.scrollingElement || document.documentElement;
+              pageScroller.scrollLeft -= nextMidpoint.x - prevMidpoint.x;
+              pageScroller.scrollTop -= nextMidpoint.y - prevMidpoint.y;
+              state.lastTouchMidpoint = nextMidpoint;
+              e.preventDefault();
+            }
+            return;
+          }
           if(state.touchPointers.size !== 1) return;
         }
         if(state.draw && state.activePointerId === e.pointerId) applyAt(e);
@@ -290,12 +331,16 @@
       c.addEventListener('pointerup', e => {
         if(e.pointerType === 'touch'){
           state.touchPointers.delete(e.pointerId);
+          state.touchPositions.delete(e.pointerId);
+          updateTouchPanState();
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
       });
       c.addEventListener('pointercancel', e => {
         if(e.pointerType === 'touch'){
           state.touchPointers.delete(e.pointerId);
+          state.touchPositions.delete(e.pointerId);
+          updateTouchPanState();
         }
         if(state.activePointerId === e.pointerId) stopDrawing();
       });
