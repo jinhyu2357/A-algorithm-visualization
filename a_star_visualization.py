@@ -34,6 +34,8 @@ class MazeAStarVisualizer:
     START = 5
     GOAL = 6
     CURRENT = 7
+    ORTHOGONAL_COST = 1.0
+    DIAGONAL_COST = 2**0.5
 
     def __init__(
         self,
@@ -159,7 +161,7 @@ class MazeAStarVisualizer:
         if len(candidates) < 2:
             raise ValueError("Not enough free cells to place start and goal.")
 
-        max_distance = (self.height - 2) + (self.width - 2)
+        max_distance = self.heuristic((1, 1), (self.height - 2, self.width - 2))
         required_distance = min(min_distance, max_distance)
 
         for _ in range(1000):
@@ -177,7 +179,7 @@ class MazeAStarVisualizer:
         if len(free_cells) < 2:
             raise ValueError("Custom map must include at least two free cells for start and goal.")
 
-        max_distance = (self.height - 1) + (self.width - 1)
+        max_distance = self.heuristic((0, 0), (self.height - 1, self.width - 1))
         required_distance = min(min_distance, max_distance)
 
         for _ in range(3000):
@@ -229,23 +231,43 @@ class MazeAStarVisualizer:
             if current == goal:
                 return True
 
-            for neighbor in self._neighbors(current):
+            for neighbor, _ in self._neighbors(current, maze=maze):
                 if neighbor in visited or maze[neighbor] == self.WALL:
                     continue
                 visited.add(neighbor)
                 queue.append(neighbor)
         return False
 
-    def _neighbors(self, position: GridPos) -> Iterable[GridPos]:
+    def _neighbors(self, position: GridPos, maze: Optional[np.ndarray] = None) -> Iterable[Tuple[GridPos, float]]:
         row, col = position
-        for d_row, d_col in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for d_row, d_col, move_cost in (
+            (1, 0, self.ORTHOGONAL_COST),
+            (-1, 0, self.ORTHOGONAL_COST),
+            (0, 1, self.ORTHOGONAL_COST),
+            (0, -1, self.ORTHOGONAL_COST),
+            (1, 1, self.DIAGONAL_COST),
+            (1, -1, self.DIAGONAL_COST),
+            (-1, 1, self.DIAGONAL_COST),
+            (-1, -1, self.DIAGONAL_COST),
+        ):
             n_row, n_col = row + d_row, col + d_col
-            if 0 <= n_row < self.height and 0 <= n_col < self.width:
-                yield (n_row, n_col)
+            if not (0 <= n_row < self.height and 0 <= n_col < self.width):
+                continue
+
+            if maze is not None and d_row != 0 and d_col != 0:
+                # Block corner-cutting through walls while allowing true diagonal movement.
+                if maze[row + d_row, col] == self.WALL or maze[row, col + d_col] == self.WALL:
+                    continue
+
+            yield (n_row, n_col), move_cost
 
     @staticmethod
-    def heuristic(a: GridPos, b: GridPos) -> int:
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    def heuristic(a: GridPos, b: GridPos) -> float:
+        d_row = abs(a[0] - b[0])
+        d_col = abs(a[1] - b[1])
+        min_delta = min(d_row, d_col)
+        max_delta = max(d_row, d_col)
+        return min_delta * MazeAStarVisualizer.DIAGONAL_COST + (max_delta - min_delta)
 
     @staticmethod
     def _direction_vector(start: GridPos, goal: GridPos) -> Tuple[float, float]:
@@ -259,13 +281,16 @@ class MazeAStarVisualizer:
     def _direction_penalty(self, current: GridPos, neighbor: GridPos) -> float:
         step_row = neighbor[0] - current[0]
         step_col = neighbor[1] - current[1]
-        alignment = step_row * self.goal_direction[0] + step_col * self.goal_direction[1]
+        step_norm = (step_row**2 + step_col**2) ** 0.5
+        if step_norm == 0:
+            return 1.0
+        alignment = (step_row / step_norm) * self.goal_direction[0] + (step_col / step_norm) * self.goal_direction[1]
         # Lower penalty means the step is better aligned with the start->goal direction vector.
         return 1.0 - alignment
 
-    def _ordered_neighbors(self, position: GridPos) -> List[GridPos]:
-        neighbors = list(self._neighbors(position))
-        neighbors.sort(key=lambda neighbor: self._direction_penalty(position, neighbor))
+    def _ordered_neighbors(self, position: GridPos) -> List[Tuple[GridPos, float]]:
+        neighbors = list(self._neighbors(position, maze=self.base_maze))
+        neighbors.sort(key=lambda item: self._direction_penalty(position, item[0]))
         return neighbors
 
     def a_star_steps(self) -> Iterator[np.ndarray]:
@@ -276,7 +301,7 @@ class MazeAStarVisualizer:
 
         start_h = self.heuristic(self.start, self.goal)
         open_heap: List[PrioritizedNode] = [PrioritizedNode((start_h, 0.0, start_h), self.start)]
-        g_score = {self.start: 0}
+        g_score = {self.start: 0.0}
         came_from: dict[GridPos, GridPos] = {}
         open_set = {self.start}
         closed_set = set()
@@ -305,11 +330,11 @@ class MazeAStarVisualizer:
                         yield self._mark_start_goal(grid.copy())
                 return
 
-            for neighbor in self._ordered_neighbors(current):
+            for neighbor, move_cost in self._ordered_neighbors(current):
                 if self.base_maze[neighbor] == self.WALL or neighbor in closed_set:
                     continue
 
-                tentative_g = g_score[current] + 1
+                tentative_g = g_score[current] + move_cost
                 if tentative_g < g_score.get(neighbor, float("inf")):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g
@@ -332,7 +357,7 @@ class MazeAStarVisualizer:
 
         start_h = self.heuristic(self.start, self.goal)
         open_heap: List[PrioritizedNode] = [PrioritizedNode((start_h, 0.0, start_h), self.start)]
-        g_score = {self.start: 0}
+        g_score = {self.start: 0.0}
         came_from: dict[GridPos, GridPos] = {}
         open_set = {self.start}
         closed_set = set()
@@ -354,11 +379,11 @@ class MazeAStarVisualizer:
                         grid[step] = self.PATH
                 return self._mark_start_goal(grid)
 
-            for neighbor in self._ordered_neighbors(current):
+            for neighbor, move_cost in self._ordered_neighbors(current):
                 if self.base_maze[neighbor] == self.WALL or neighbor in closed_set:
                     continue
 
-                tentative_g = g_score[current] + 1
+                tentative_g = g_score[current] + move_cost
                 if tentative_g < g_score.get(neighbor, float("inf")):
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g
